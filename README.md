@@ -1,119 +1,112 @@
-# 热量计算App
+# 🥗 AI Calorie Tracker
 
-这是一个使用React Native和Expo构建的热量计算app。
+A cross-platform mobile app built with **React Native + Expo** that uses AI to identify food and calculate nutrition.
 
-## 功能
-
-- 根据用户输入计算BMR和TDEE
-- 显示每日宏营养素目标
-- 拍照食物以识别并获取营养信息
-
-## 设置
-
-1. 安装依赖：`npm install`
-2. 从https://huggingface.co/settings/tokens获取Hugging Face API令牌
-3. 将`app/camera.js`中的'YOUR_HF_TOKEN'替换为您的令牌
-4. 运行：`npx expo start`
-
-## 使用的API
-
-- Hugging Face用于食物识别（nateraw/food模型）
-- USDA FoodData Central用于营养数据
-
-# Fitness AI App (MVP)
-
-## Overview
-
-This is a mobile fitness application that helps users track their daily calorie intake and nutritional needs using AI-powered food recognition.
-
-The app allows users to:
-
-* Calculate BMR and TDEE
-* Estimate daily macronutrient needs
-* Analyze food by taking a photo
+![React Native](https://img.shields.io/badge/React_Native-0.71-blue?logo=react)
+![Expo](https://img.shields.io/badge/Expo-SDK_54-black?logo=expo)
+![Hugging Face](https://img.shields.io/badge/Hugging_Face-nateraw%2Ffood-yellow?logo=huggingface)
 
 ---
 
-## Features
+## ✨ Features
 
-### 1. BMR & TDEE Calculation
-
-* Uses Mifflin-St Jeor Equation
-* Calculates:
-
-  * Basal Metabolic Rate (BMR)
-  * Total Daily Energy Expenditure (TDEE)
-
----
-
-### 2. Macronutrient Calculation
-
-Based on TDEE, the app calculates:
-
-* Protein intake
-* Fat intake
-* Carbohydrates intake
-
-Default ratio:
-
-* Protein: 30%
-* Fat: 25%
-* Carbs: 45%
+| Feature | Description |
+|---------|-------------|
+| 🧮 **BMR / TDEE Calculator** | Mifflin-St Jeor formula with 5 activity levels |
+| 🥩 **Macro Planner** | Muscle gain / Fat loss / Custom ratio modes |
+| 📸 **AI Food Recognition** | Photo → Hugging Face model → USDA nutrition data |
+| 👤 **Profile Page** | BMI, body stats, daily calorie goal |
+| 🌍 **7 Languages** | 繁中・English・Español・日本語・한국어・Tiếng Việt・ภาษาไทย |
 
 ---
 
-### 3. Food Recognition (AI)
+## 🚀 Getting Started
 
-* Users can take a photo or upload an image
-* The app uses Google Vision API to detect food labels
-* The detected food is mapped to:
+### Prerequisites
+- [Node.js](https://nodejs.org/) v18+
+- [Expo Go](https://expo.dev/go) app on your phone (iOS / Android)
 
-  * Calories
-  * Protein
-  * Fat
-  * Carbohydrates
+### 1. Clone the repo
+```bash
+git clone https://github.com/Taian-an/calorie-app.git
+cd calorie-app
+```
 
----
+### 2. Install dependencies
+```bash
+npm install
+```
 
-## Tech Stack
+### 3. Set up your Hugging Face token
+Create a `.env.local` file in the project root:
+```bash
+EXPO_PUBLIC_HF_TOKEN=your_token_here
+```
+> Get a free token at 👉 https://huggingface.co/settings/tokens
 
-* Frontend: Flutter
-* Backend: Firebase (optional)
-* AI Service: Google Cloud Vision API
-
----
-
-## How It Works
-
-1. User inputs personal data (age, weight, height, gender)
-2. App calculates BMR and TDEE
-3. User takes a photo of food
-4. Image is sent to Vision API
-5. API returns food label
-6. App maps label to nutrition data
-7. Results are displayed
-
----
-
-## Limitations
-
-* Food recognition may not be 100% accurate
-* Nutrition data is estimated, not precise
-* Portion size detection is not included in MVP
+### 4. Start the app
+```bash
+npx expo start
+```
+Scan the QR code with **Expo Go** on your phone.
 
 ---
 
-## Future Improvements
+## 🏗 Tech Stack
 
-* Portion size estimation
-* Barcode scanning
-* Meal history tracking
-* AI-based diet recommendations
+| Layer | Technology |
+|-------|------------|
+| Framework | React Native + Expo Router |
+| Food AI | Hugging Face — `nateraw/food` model |
+| Nutrition DB | USDA FoodData Central API |
+| Language | JavaScript (ES2022) |
 
 ---
 
-## Disclaimer
+## 📁 Project Structure
 
-This app provides estimated nutritional information and should not be considered medical or dietary advice.
+```
+calorie-app/
+├── app/
+│   ├── _layout.js          # Tab navigation + Language Provider
+│   ├── index.js            # BMR / TDEE Calculator
+│   ├── plan.js             # Macro planner with goal modes
+│   ├── camera.js           # AI food recognition
+│   ├── profile.js          # User profile & settings
+│   ├── _translations.js    # 7-language strings
+│   └── _LanguageContext.js # Global language state
+├── avatars/                # Profile images
+└── .env.local              # Your API tokens (not committed)
+```
 
-注意：USDA DEMO_KEY有使用限制，请从https://fdc.nal.usda.gov/api-key-signup.html获取自己的API密钥以用于生产环境。
+---
+
+## ⚙️ How It Works
+
+```
+User inputs age / height / weight / activity
+        ↓
+BMR calculated via Mifflin-St Jeor Equation
+        ↓
+TDEE = BMR × Activity Factor
+        ↓
+Macro targets split by selected goal (Muscle / Cut / Custom)
+        ↓
+Take photo → Hugging Face classifies food
+        ↓
+USDA API returns calories, protein, carbs, fat
+```
+
+---
+
+## ⚠️ Notes
+
+- USDA `DEMO_KEY` has rate limits. Get a free key at: https://fdc.nal.usda.gov/api-key-signup.html
+- Food recognition accuracy depends on photo quality and angle.
+- Nutritional values are per 100g and are estimates only.
+
+---
+
+## 📄 License
+
+MIT License — feel free to use and modify.
