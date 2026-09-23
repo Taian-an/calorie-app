@@ -43,7 +43,7 @@ function defaultMealType() {
 }
 
 export default function DietCamera() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const router = useRouter();
   const { profile, addMeal, getDayTotals } = useUserData();
   const { mealType: mealTypeParam, autoPick, manual } = useLocalSearchParams();
@@ -91,7 +91,7 @@ export default function DietCamera() {
     // navigator.mediaDevices 只在安全環境 (HTTPS 或 localhost) 才存在，
     // 用一般區網 IP 的 http:// 開啟時它會是 undefined，直接呼叫會拋出例外把整個頁面弄空白
     if (!navigator.mediaDevices?.getUserMedia) {
-      setWebError('此瀏覽器連線不安全 (非 HTTPS)，無法使用相機，請改用 HTTPS 網址開啟');
+      setWebError(t.camWebInsecure);
       setWebPermission(false);
       return;
     }
@@ -107,7 +107,7 @@ export default function DietCamera() {
       })
       .catch((err) => {
         console.error("網頁相機請求失敗:", err);
-        setWebError('無法取得相機權限，請確認瀏覽器已允許存取鏡頭，或點下方按鈕重試');
+        setWebError(t.camWebDenied);
         setWebPermission(false);
       });
   };
@@ -156,7 +156,7 @@ export default function DietCamera() {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        showError('需要相簿權限才能選擇圖片');
+        showError(t.camNeedLibrary);
         return;
       }
     }
@@ -169,7 +169,7 @@ export default function DietCamera() {
     if (!result.canceled && result.assets?.length) {
       let uris = result.assets.map(a => a.uri);
       if (Platform.OS === 'web') uris = await Promise.all(uris.map(toDataUri));
-      if (photos.length + uris.length > MAX_PHOTOS) showError(`最多只能選 ${MAX_PHOTOS} 張照片，多的已省略`);
+      if (photos.length + uris.length > MAX_PHOTOS) showError(t.camTooManyPhotos.replace('{n}', MAX_PHOTOS));
       setPhotos(prev => [...prev, ...uris].slice(0, MAX_PHOTOS));
     }
   };
@@ -178,18 +178,18 @@ export default function DietCamera() {
   if (!hasCameraPermission && !photos.length && !manualEntry) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>{webError ?? '需要相機權限才能拍照辨識食物卡路里'}</Text>
+        <Text style={styles.errorText}>{webError ?? t.camNeedPermission}</Text>
         {Platform.OS !== 'web' ? (
           <TouchableOpacity style={[styles.btn, styles.confirmBtn]} onPress={requestPermission}>
-            <Text style={styles.btnText}>授予相機權限</Text>
+            <Text style={styles.btnText}>{t.camGrantPermission}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={[styles.btn, styles.confirmBtn]} onPress={requestWebCamera}>
-            <Text style={styles.btnText}>📷 開啟相機</Text>
+            <Text style={styles.btnText}>{t.camOpenWebCamera}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={[styles.btn, styles.cancelBtn, { marginTop: 12 }]} onPress={pickFromGallery}>
-          <Text style={styles.btnText}>改從相簿選擇圖片</Text>
+          <Text style={styles.btnText}>{t.camPickFromGallery}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -219,7 +219,7 @@ export default function DietCamera() {
             setPhotos(prev => [...prev, data.uri].slice(0, MAX_PHOTOS));
           }
         } catch (err) {
-          showError("手機拍照失敗: " + err.message);
+          showError(t.camCaptureFailed + err.message);
         }
       }
     }
@@ -228,7 +228,7 @@ export default function DietCamera() {
   // --- 上傳分析 ---
   const uploadAndAnalyze = async () => {
     if (manualEntry) {
-      if (!description.trim()) { showError('請先輸入食物描述'); return; }
+      if (!description.trim()) { showError(t.camEnterDescription); return; }
     } else if (!photos.length) {
       return;
     }
@@ -249,7 +249,7 @@ export default function DietCamera() {
           const blob = await response.blob();
           formData.append('images', blob, `food-capture-${i}.jpg`);
         } catch (err) {
-          showError("圖片轉換失敗");
+          showError(t.camImageConvertFailed);
           setLoading(false);
           return;
         }
@@ -266,6 +266,10 @@ export default function DietCamera() {
     if (description.trim()) {
       formData.append('description', description.trim());
     }
+    // AI 回傳的食物名稱、組成明細跟著 App 的語言設定（後端只認 'en'，其他都當中文）
+    formData.append('lang', lang);
+    // 讓 AI 用 App 目前的語言回傳食物名稱與明細（英文介面就回英文），後端預設中文
+    formData.append('lang', lang);
 
     try {
       // 後端會在同一個 request 裡等辨識做完（一般 3~4 秒），做完就直接回 status:'done' + 結果；
@@ -283,11 +287,11 @@ export default function DietCamera() {
     } catch (error) {
       console.error(error);
       if (error.code === 'ECONNABORTED') {
-        showError('連線逾時，請確認網路連線後再試一次');
+        showError(t.camTimeout);
       } else if (!error.response) {
-        showError('無法連線到伺服器，請確認網路連線或伺服器位址設定');
+        showError(t.camNoServer);
       } else {
-        showError(error.response?.data?.error ?? 'AI 分析失敗，請重試');
+        showError(analysisErrorMessage(error.response?.data?.error));
       }
       setLoading(false);
     }
@@ -309,14 +313,14 @@ export default function DietCamera() {
         return;
       }
       if (data.status === 'failed') {
-        showError(data.error ?? 'AI 分析失敗，請重試');
+        showError(analysisErrorMessage(data.error));
         setLoading(false);
         return;
       }
       await new Promise(resolve => setTimeout(resolve, POLL_MS));
     }
 
-    showError('分析時間過長，請稍後再試一次');
+    showError(t.camTooSlow);
     setLoading(false);
   };
 
@@ -343,12 +347,16 @@ export default function DietCamera() {
     setLogged(true);
   };
 
+  // 後端的錯誤訊息是給開發者看的（中英混雜、含模型名稱），畫面上一律換成目前語言的友善訊息
+  const analysisErrorMessage = (serverError) =>
+    serverError === 'No food data found' ? t.camNoFood : t.camAnalysisFailed;
+
   const showError = (message) => {
     if (Platform.OS === 'web') {
       window.alert(message);
     } else {
       const { Alert } = require('react-native');
-      Alert.alert("提示", message);
+      Alert.alert(t.camNotice, message);
     }
   };
 
@@ -361,7 +369,7 @@ export default function DietCamera() {
             <canvas ref={canvasRef} style={{ display: 'none' }} />
             <View style={styles.controlRow}>
               <TouchableOpacity style={styles.galleryButton} onPress={pickFromGallery}>
-                <Text style={styles.galleryButtonText}>相簿</Text>
+                <Text style={styles.galleryButtonText}>{t.camGalleryShort}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.shutterButton} onPress={takePicture}>
                 <View style={styles.shutterInner} />
@@ -374,7 +382,7 @@ export default function DietCamera() {
           <CameraView style={styles.cameraBox} ref={cameraRef} facing="back">
             <View style={styles.controlRow}>
               <TouchableOpacity style={styles.galleryButton} onPress={pickFromGallery}>
-                <Text style={styles.galleryButtonText}>相簿</Text>
+                <Text style={styles.galleryButtonText}>{t.camGalleryShort}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.shutterButton} onPress={takePicture}>
                 <View style={styles.shutterInner} />
@@ -445,10 +453,10 @@ export default function DietCamera() {
             const remaining = target != null ? Math.round(target - todayTotals.energy) : null;
             return (
               <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>🍽️ {result.name}{result.grams ? `（約 ${result.grams}g）` : ''}</Text>
+                <Text style={styles.resultTitle}>🍽️ {result.name}{result.grams ? t.camApprox.replace('{g}', result.grams) : ''}</Text>
                 <Text style={styles.resultText}>📒 {logged ? t.loggedToMeal : t.willLogToMeal}: {t[mealType]}</Text>
-                <Text style={styles.resultText}>🔥 熱量: {result.energy} kcal</Text>
-                <Text style={styles.resultText}>💪 蛋: {result.protein}g | 🍞 碳: {result.carbs}g | 🥑 脂: {result.fat}g</Text>
+                <Text style={styles.resultText}>{t.camEnergyLine}: {result.energy} kcal</Text>
+                <Text style={styles.resultText}>{t.camMacroLine.replace('{p}', result.protein).replace('{c}', result.carbs).replace('{f}', result.fat)}</Text>
                 {result.items?.length > 1 && (
                   // AI 拆解的組成明細（白飯 180g · 234 kcal…），讓使用者看得出總熱量怎麼來、哪一項估錯了好在描述裡補充重跑
                   <View style={styles.itemList}>
@@ -460,8 +468,8 @@ export default function DietCamera() {
                 {remaining != null && (
                   <Text style={styles.remainingText}>
                     {remaining >= 0
-                      ? `今天還可以吃 ${remaining} kcal`
-                      : `今天已超出目標 ${Math.abs(remaining)} kcal`}
+                      ? t.camRemaining.replace('{n}', remaining)
+                      : t.camOver.replace('{n}', Math.abs(remaining))}
                   </Text>
                 )}
                 {logged && <Text style={styles.savedText}>✅ {t.savedLog}</Text>}
@@ -484,14 +492,14 @@ export default function DietCamera() {
                   }}
                   disabled={loading}
                 >
-                  <Text style={styles.btnText}>{result ? t.cancelLog : (manualEntry ? '取消' : '重拍')}</Text>
+                  <Text style={styles.btnText}>{result ? t.cancelLog : (manualEntry ? t.camCancel : t.camRetake)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.btn, styles.confirmBtn]}
                   onPress={result ? confirmLog : uploadAndAnalyze}
                   disabled={loading}
                 >
-                  <Text style={styles.btnText}>{loading ? "分析中..." : (result ? t.saveLog : "確認分析")}</Text>
+                  <Text style={styles.btnText}>{loading ? t.camAnalyzing : (result ? t.saveLog : t.camAnalyze)}</Text>
                 </TouchableOpacity>
               </>
             )}
