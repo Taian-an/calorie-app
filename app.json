@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "AI Calorie Tracker",
+    "slug": "calorie-app",
+    "version": "1.0.0",
+    "scheme": "calorie-app",
+    "orientation": "portrait",
+    "icon": "./avatars/avatar.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#16A34A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.taianan.calorieapp"
+    },
+    "android": {
+      "package": "com.taianan.calorieapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#16A34A"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "spa",
+      "favicon": "./avatars/avatar.png",
+      "baseUrl": "/calorie-app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to recognize food"
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

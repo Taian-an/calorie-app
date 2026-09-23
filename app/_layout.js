@@ -1,76 +1,36 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { LanguageProvider, useLanguage } from './_LanguageContext';
+import { Stack } from 'expo-router';
+import { LanguageProvider } from '../context/LanguageContext';
+import { UserDataProvider, useUserData } from '../context/UserDataContext';
 
-function AppTabs() {
-  const { t } = useLanguage();
+// 登入是進 App 的第一道關卡，引導問卷是第二道：
+// 未登入 → login/register；登入但還沒填過身體資料（profile.height 是 null）→ onboarding；都完成才看得到 (tabs)。
+function RootNavigator() {
+  const { loaded, authEmail, profile } = useUserData();
+  if (!loaded) return null;
+  const onboarded = profile?.height != null;
+
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#22C55E',
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 64,
-        },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', marginTop: 2 },
-        headerStyle: { backgroundColor: '#F0FDF4' },
-        headerTintColor: '#14532D',
-        headerTitleStyle: { fontWeight: '800', fontSize: 18 },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t.appTitle,
-          tabBarLabel: t.tabCalc,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calculator-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="plan"
-        options={{
-          title: t.planTitle,
-          tabBarLabel: t.tabPlan,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="nutrition-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="camera"
-        options={{
-          title: t.appTitle,
-          tabBarLabel: t.tabCamera,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="camera-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t.tabProfile,
-          tabBarLabel: t.tabProfile,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!!authEmail && onboarded}>
+        <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Protected guard={!!authEmail && !onboarded}>
+        <Stack.Screen name="onboarding" />
+      </Stack.Protected>
+      <Stack.Protected guard={!authEmail}>
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+      </Stack.Protected>
+    </Stack>
   );
 }
 
-export default function TabLayout() {
+export default function RootLayout() {
   return (
-    <LanguageProvider>
-      <AppTabs />
-    </LanguageProvider>
+    <UserDataProvider>
+      <LanguageProvider>
+        <RootNavigator />
+      </LanguageProvider>
+    </UserDataProvider>
   );
 }
