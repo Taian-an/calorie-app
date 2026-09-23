@@ -266,8 +266,6 @@ export default function DietCamera() {
     if (description.trim()) {
       formData.append('description', description.trim());
     }
-    // AI 回傳的食物名稱、組成明細跟著 App 的語言設定（後端只認 'en'，其他都當中文）
-    formData.append('lang', lang);
     // 讓 AI 用 App 目前的語言回傳食物名稱與明細（英文介面就回英文），後端預設中文
     formData.append('lang', lang);
 

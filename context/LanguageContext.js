@@ -1,10 +1,25 @@
-import { createContext, useContext, useState } from 'react';
-import translations from '../constants/translations';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import translations, { LANG_KEYS } from '../constants/translations';
 
 const LanguageContext = createContext(null);
+const LANG_KEY = '@calorie_app_lang';
 
+// 語言選擇要存起來：以前只放在 state 裡，使用者切成英文、App 一重開又回到中文
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState('zh');
+  const [lang, setLangState] = useState('zh');
+
+  useEffect(() => {
+    AsyncStorage.getItem(LANG_KEY)
+      .then(saved => { if (LANG_KEYS.includes(saved)) setLangState(saved); })
+      .catch(() => {});
+  }, []);
+
+  const setLang = useCallback((next) => {
+    setLangState(next);
+    AsyncStorage.setItem(LANG_KEY, next).catch(() => {});
+  }, []);
+
   const t = translations[lang];
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
