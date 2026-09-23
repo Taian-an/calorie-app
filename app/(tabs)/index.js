@@ -455,6 +455,19 @@ export default function DiaryScreen() {
               <Ionicons name="create-outline" size={20} color={C.primaryDark} />
               <Text style={s.uploadBtnText}>{t.manualTextOption}</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.uploadBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                const type = addTarget;
+                setAddTarget(null);
+                router.push({ pathname: '/barcode', params: { mealType: type } });
+              }}
+            >
+              <Ionicons name="barcode-outline" size={20} color={C.primaryDark} />
+              <Text style={s.uploadBtnText}>{t.barcodeScanOption}</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>

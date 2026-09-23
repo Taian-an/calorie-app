@@ -71,6 +71,14 @@ export default function TabLayout() {
           title: t.appTitle,
         }}
       />
+      {/* 條碼掃描同樣不佔分頁，由餐次 + 按鈕進入 */}
+      <Tabs.Screen
+        name="barcode"
+        options={{
+          href: null,
+          title: t.barcodeScanOption,
+        }}
+      />
     </Tabs>
   );
 }
