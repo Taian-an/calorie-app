@@ -235,8 +235,9 @@ export function UserDataProvider({ children }) {
 
   // AI 教練對話：messages 是 [{ role: 'user' | 'model', text }, ...]，整段本地陣列送給後端當上下文，
   // 對話紀錄只存在裝置上（不落地存 DB），回傳這次 AI 的回覆文字
-  const sendCoachMessage = useCallback(async (messages) => {
-    const { data } = await axios.post(`${API_BASE}/coach/chat`, { messages }, { headers: authHeaders() });
+  // lang（'zh' | 'en'）讓教練用 App 目前的語言回答
+  const sendCoachMessage = useCallback(async (messages, lang) => {
+    const { data } = await axios.post(`${API_BASE}/coach/chat`, { messages, lang }, { headers: authHeaders() });
     return data.reply;
   }, []);
 

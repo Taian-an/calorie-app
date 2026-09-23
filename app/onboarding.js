@@ -19,11 +19,12 @@ const C = {
 };
 
 const ACTIVITY_EMOJI = { sedentary: '🧘', lightly: '🚶', moderately: '🏃', very: '🏋️', extra: '🥊' };
+// labelKey 對應 translations 裡的字串，顯示時才依目前語言取值
 const DURATIONS = [
-  { key: '4',  label: '1 個月' },
-  { key: '12', label: '3 個月' },
-  { key: '24', label: '6 個月' },
-  { key: '52', label: '1 年' },
+  { key: '4',  labelKey: 'obDur1m' },
+  { key: '12', labelKey: 'obDur3m' },
+  { key: '24', labelKey: 'obDur6m' },
+  { key: '52', labelKey: 'obDur1y' },
 ];
 const TOTAL_STEPS = 7;
 const BUILD_MS = 2200;
@@ -74,10 +75,10 @@ export default function OnboardingScreen() {
   };
 
   const bmi = weight / ((height / 100) ** 2);
-  const bmiTag = bmi < 18.5 ? { label: '過輕', color: '#3B82F6' }
-    : bmi < 24 ? { label: '健康', color: C.primary }
-    : bmi < 28 ? { label: '偏重', color: C.warn }
-    : { label: '過重', color: '#EF4444' };
+  const bmiTag = bmi < 18.5 ? { label: t.obBmiUnder, color: '#3B82F6' }
+    : bmi < 24 ? { label: t.obBmiHealthy, color: C.primary }
+    : bmi < 28 ? { label: t.obBmiOver, color: C.warn }
+    : { label: t.obBmiObese, color: '#EF4444' };
 
   const weightDiff = targetWeight - weight;
   const weeklyRate = Math.abs(weightDiff) / (durationWeeks / 4);
@@ -101,10 +102,10 @@ export default function OnboardingScreen() {
       <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
         {step === 0 && (
           <>
-            <Text style={s.title}>選擇你的性別</Text>
-            <Text style={s.subtitle}>男性的基礎代謝率通常比女性更高。</Text>
+            <Text style={s.title}>{t.obGenderTitle}</Text>
+            <Text style={s.subtitle}>{t.obGenderSub}</Text>
             <View style={s.genderRow}>
-              {[{ key: 'male', label: '男性', emoji: '🙋‍♂️' }, { key: 'female', label: '女性', emoji: '🙋‍♀️' }].map(g => (
+              {[{ key: 'male', label: t.obMale, emoji: '🙋‍♂️' }, { key: 'female', label: t.obFemale, emoji: '🙋‍♀️' }].map(g => (
                 <TouchableOpacity
                   key={g.key}
                   style={[s.genderCard, gender === g.key && s.genderCardActive]}
@@ -121,24 +122,24 @@ export default function OnboardingScreen() {
 
         {step === 1 && (
           <>
-            <Text style={s.title}>你的年齡是？</Text>
-            <Text style={s.subtitle}>隨著年齡增長，基礎代謝會逐漸下降。點數字可以直接輸入。</Text>
-            <Stepper value={age} onChange={setAge} unit="歲" min={13} max={100} />
+            <Text style={s.title}>{t.obAgeTitle}</Text>
+            <Text style={s.subtitle}>{t.obAgeSub}</Text>
+            <Stepper value={age} onChange={setAge} unit={t.obYears} min={13} max={100} />
           </>
         )}
 
         {step === 2 && (
           <>
-            <Text style={s.title}>你的身高是多少？</Text>
-            <Text style={s.subtitle}>身高和體重是決定基礎代謝率的重要指標。點數字可以直接輸入。</Text>
+            <Text style={s.title}>{t.obHeightTitle}</Text>
+            <Text style={s.subtitle}>{t.obBodySub}</Text>
             <Stepper value={height} onChange={setHeight} unit="cm" step={1} min={100} max={230} />
           </>
         )}
 
         {step === 3 && (
           <>
-            <Text style={s.title}>你目前的體重是？</Text>
-            <Text style={s.subtitle}>身高和體重是決定基礎代謝率的重要指標。點數字可以直接輸入。</Text>
+            <Text style={s.title}>{t.obWeightTitle}</Text>
+            <Text style={s.subtitle}>{t.obBodySub}</Text>
             <Stepper value={weight} onChange={setWeight} unit="kg" step={0.5} min={30} max={250} />
             <View style={[s.feedbackCard, { borderColor: bmiTag.color }]}>
               <View style={s.bmiRow}>
@@ -151,14 +152,14 @@ export default function OnboardingScreen() {
 
         {step === 4 && (
           <>
-            <Text style={s.title}>你的理想體重是？</Text>
-            <Text style={s.subtitle}>目標體重會影響你的每日熱量預算。點數字可以直接輸入。</Text>
+            <Text style={s.title}>{t.obTargetTitle}</Text>
+            <Text style={s.subtitle}>{t.obTargetSub}</Text>
             <Stepper value={targetWeight} onChange={setTargetWeight} unit="kg" step={0.5} min={30} max={250} />
             <View style={s.feedbackCard}>
               <Text style={s.feedbackText}>
                 {Math.abs(weightDiff) < 0.3
-                  ? '維持目前體重'
-                  : `你將${weightDiff > 0 ? '增加' : '減少'} ${Math.abs(weightDiff).toFixed(1)} kg`}
+                  ? t.obMaintain
+                  : (weightDiff > 0 ? t.obGain : t.obLose).replace('{n}', Math.abs(weightDiff).toFixed(1))}
               </Text>
             </View>
           </>
@@ -166,8 +167,8 @@ export default function OnboardingScreen() {
 
         {step === 5 && (
           <>
-            <Text style={s.title}>你想多久達到目標？</Text>
-            <Text style={s.subtitle}>時間長短會影響你的每週節奏，越急促難度越高。</Text>
+            <Text style={s.title}>{t.obDurationTitle}</Text>
+            <Text style={s.subtitle}>{t.obDurationSub}</Text>
             <View style={s.durationGrid}>
               {DURATIONS.map(d => (
                 <TouchableOpacity
@@ -176,7 +177,7 @@ export default function OnboardingScreen() {
                   onPress={() => setDurationKey(d.key)}
                   activeOpacity={0.85}
                 >
-                  <Text style={[s.durationChipText, durationKey === d.key && s.durationChipTextActive]}>{d.label}</Text>
+                  <Text style={[s.durationChipText, durationKey === d.key && s.durationChipTextActive]}>{t[d.labelKey]}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -184,7 +185,7 @@ export default function OnboardingScreen() {
                 onPress={() => setDurationKey('other')}
                 activeOpacity={0.85}
               >
-                <Text style={[s.durationChipText, durationKey === 'other' && s.durationChipTextActive]}>其他</Text>
+                <Text style={[s.durationChipText, durationKey === 'other' && s.durationChipTextActive]}>{t.obDurOther}</Text>
               </TouchableOpacity>
             </View>
 
@@ -198,14 +199,14 @@ export default function OnboardingScreen() {
                   placeholder="3"
                   placeholderTextColor={C.textSecondary}
                 />
-                <Text style={s.customDurationUnit}>個月</Text>
+                <Text style={s.customDurationUnit}>{t.obMonthsUnit}</Text>
               </View>
             )}
 
             {Math.abs(weightDiff) >= 0.3 && (
               <View style={s.feedbackCard}>
                 <Text style={s.feedbackText}>
-                  平均每個月{weightDiff > 0 ? '增加' : '減少'} 約 {weeklyRate.toFixed(1)} kg
+                  {(weightDiff > 0 ? t.obMonthlyGain : t.obMonthlyLose).replace('{n}', weeklyRate.toFixed(1))}
                 </Text>
               </View>
             )}
@@ -214,8 +215,8 @@ export default function OnboardingScreen() {
 
         {step === 6 && (
           <>
-            <Text style={s.title}>你的活動量如何？</Text>
-            <Text style={s.subtitle}>這會用來估算你的每日熱量消耗。</Text>
+            <Text style={s.title}>{t.obActivityTitle}</Text>
+            <Text style={s.subtitle}>{t.obActivitySub}</Text>
             {t.activities.map(level => {
               const isSel = activity === level.key;
               return (
@@ -240,7 +241,7 @@ export default function OnboardingScreen() {
 
       <View style={s.footer}>
         <TouchableOpacity style={s.btn} onPress={step === TOTAL_STEPS - 1 ? startBuilding : next} activeOpacity={0.85}>
-          <Text style={s.btnText}>{step === TOTAL_STEPS - 1 ? '完成' : '繼續'}</Text>
+          <Text style={s.btnText}>{step === TOTAL_STEPS - 1 ? t.obFinish : t.obContinue}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -297,6 +298,7 @@ function Stepper({ value, onChange, unit, step = 1, min, max }) {
 
 // 完成問卷後的「建立計劃中 0→100% → 已完成」轉場，跑完動畫才真的存檔放行進 App
 function BuildingScreen({ phase, onBuilt, result, onContinue }) {
+  const { t } = useLanguage();
   const anim = useRef(new Animated.Value(0)).current;
   const [percent, setPercent] = useState(0);
   const checkScale = useRef(new Animated.Value(0.4)).current;
@@ -332,20 +334,20 @@ function BuildingScreen({ phase, onBuilt, result, onContinue }) {
                 ]}
               />
             </View>
-            <Text style={s.buildTitle}>正在為你打造專屬計劃…</Text>
-            <Text style={s.buildSubtitle}>根據你的資料計算每日熱量與營養素目標</Text>
+            <Text style={s.buildTitle}>{t.obBuilding}</Text>
+            <Text style={s.buildSubtitle}>{t.obBuildingSub}</Text>
           </>
         ) : (
           <>
             <Animated.View style={[s.checkCircle, { transform: [{ scale: checkScale }] }]}>
               <Ionicons name="checkmark" size={48} color="#FFF" />
             </Animated.View>
-            <Text style={s.buildTitle}>計劃已制定完成！</Text>
+            <Text style={s.buildTitle}>{t.obBuilt}</Text>
             <Text style={s.buildSubtitle}>
-              {result ? `每日建議攝取約 ${Math.round(result.target)} kcal` : ''}
+              {result ? t.obDailyTarget.replace('{n}', Math.round(result.target)) : ''}
             </Text>
             <TouchableOpacity style={[s.btn, s.doneBtn]} onPress={onContinue} activeOpacity={0.85}>
-              <Text style={s.btnText}>繼續</Text>
+              <Text style={s.btnText}>{t.obContinue}</Text>
             </TouchableOpacity>
           </>
         )}

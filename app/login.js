@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../context/UserDataContext';
 import GoogleAuthButton, { GOOGLE_LOGIN_ENABLED } from '../components/GoogleAuthButton';
+import { authErrorMessage } from '../constants/authErrors';
 
 const C = {
   primary:       '#22C55E',
@@ -38,7 +39,7 @@ export default function LoginScreen() {
       await login(email, password);
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err.response?.data?.error ?? t.authFailed);
+      setError(authErrorMessage(err, t));
     } finally {
       setBusy(false);
     }
@@ -51,10 +52,10 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.title}>歡迎回來！</Text>
-          <Text style={s.subtitle}>很高興再次見到你！</Text>
+          <Text style={s.title}>{t.loginWelcome}</Text>
+          <Text style={s.subtitle}>{t.loginWelcomeSub}</Text>
 
-          <Text style={s.label}>Email<Text style={s.req}> *</Text></Text>
+          <Text style={s.label}>{t.emailLabel}<Text style={s.req}> *</Text></Text>
           <TextInput
             style={s.input}
             value={email}
@@ -78,7 +79,7 @@ export default function LoginScreen() {
             <>
               <View style={s.dividerRow}>
                 <View style={s.dividerLine} />
-                <Text style={s.dividerText}>或</Text>
+                <Text style={s.dividerText}>{t.orDivider}</Text>
                 <View style={s.dividerLine} />
               </View>
               <View style={{ marginBottom: 14 }}>
@@ -88,11 +89,11 @@ export default function LoginScreen() {
           )}
 
           <TouchableOpacity
-            onPress={() => Alert.alert('提示', '忘記密碼功能尚未開放，請聯繫客服協助重設。')}
+            onPress={() => Alert.alert(t.camNotice, t.forgotPasswordUnavailable)}
             activeOpacity={0.7}
             style={[s.forgotWrap, GOOGLE_LOGIN_ENABLED && { marginTop: 0 }]}
           >
-            <Text style={s.forgot}>忘記密碼？</Text>
+            <Text style={s.forgot}>{t.forgotPassword}</Text>
           </TouchableOpacity>
 
           {error && <Text style={s.error}>{error}</Text>}
@@ -107,9 +108,9 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <View style={s.footerRow}>
-            <Text style={s.footerText}>還沒有帳號？</Text>
+            <Text style={s.footerText}>{t.noAccount}</Text>
             <TouchableOpacity onPress={() => router.push('/register')} activeOpacity={0.7}>
-              <Text style={s.footerLink}>Sign Up</Text>
+              <Text style={s.footerLink}>{t.signUpLink}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

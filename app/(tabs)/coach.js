@@ -24,7 +24,7 @@ let uid = 0;
 const nextId = () => `${Date.now()}-${uid++}`;
 
 export default function CoachScreen() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { sendCoachMessage } = useUserData();
   const [messages, setMessages] = useState(() => [
     { id: nextId(), role: 'model', text: t.coachGreeting },
@@ -45,7 +45,7 @@ export default function CoachScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
 
     try {
-      const reply = await sendCoachMessage(history.map(({ role, text }) => ({ role, text })));
+      const reply = await sendCoachMessage(history.map(({ role, text }) => ({ role, text })), lang);
       setMessages(prev => [...prev, { id: nextId(), role: 'model', text: reply }]);
     } catch {
       setMessages(prev => [...prev, { id: nextId(), role: 'model', text: t.coachError, isError: true }]);
@@ -53,7 +53,7 @@ export default function CoachScreen() {
       setSending(false);
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
     }
-  }, [input, sending, messages, sendCoachMessage, t.coachError]);
+  }, [input, sending, messages, sendCoachMessage, t.coachError, lang]);
 
   const handleClear = useCallback(() => {
     setMessages([{ id: nextId(), role: 'model', text: t.coachGreeting }]);

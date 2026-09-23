@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../context/UserDataContext';
 import GoogleAuthButton, { GOOGLE_LOGIN_ENABLED } from '../components/GoogleAuthButton';
+import { authErrorMessage } from '../constants/authErrors';
 
 const C = {
   primary:       '#22C55E',
@@ -41,7 +42,7 @@ export default function RegisterScreen() {
       await register(email, username, password, name);
       router.replace('/(tabs)');
     } catch (err) {
-      setError(err.response?.data?.error ?? t.authFailed);
+      setError(authErrorMessage(err, t));
     } finally {
       setBusy(false);
     }
@@ -54,11 +55,11 @@ export default function RegisterScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.title}>建立帳號</Text>
+          <Text style={s.title}>{t.createAccount}</Text>
 
           <View style={s.row}>
             <View style={s.rowItem}>
-              <Text style={s.label}>First Name</Text>
+              <Text style={s.label}>{t.firstName}</Text>
               <TextInput
                 style={s.input}
                 value={firstName}
@@ -68,7 +69,7 @@ export default function RegisterScreen() {
               />
             </View>
             <View style={s.rowItem}>
-              <Text style={s.label}>Last Name</Text>
+              <Text style={s.label}>{t.lastName}</Text>
               <TextInput
                 style={s.input}
                 value={lastName}
@@ -79,7 +80,7 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          <Text style={s.label}>Email<Text style={s.req}> *</Text></Text>
+          <Text style={s.label}>{t.emailLabel}<Text style={s.req}> *</Text></Text>
           <TextInput
             style={s.input}
             value={email}
@@ -90,7 +91,7 @@ export default function RegisterScreen() {
             keyboardType="email-address"
           />
 
-          <Text style={s.label}>使用者名稱<Text style={s.req}> *</Text></Text>
+          <Text style={s.label}>{t.usernameLabel}<Text style={s.req}> *</Text></Text>
           <TextInput
             style={s.input}
             value={username}
@@ -113,7 +114,7 @@ export default function RegisterScreen() {
             <>
               <View style={s.dividerRow}>
                 <View style={s.dividerLine} />
-                <Text style={s.dividerText}>或</Text>
+                <Text style={s.dividerText}>{t.orDivider}</Text>
                 <View style={s.dividerLine} />
               </View>
               <View style={{ marginBottom: 14 }}>
@@ -134,7 +135,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
 
           <View style={s.footerRow}>
-            <Text style={s.footerText}>已經有帳號了？</Text>
+            <Text style={s.footerText}>{t.haveAccount}</Text>
             <TouchableOpacity onPress={() => router.replace('/login')} activeOpacity={0.7}>
               <Text style={s.footerLink}>{t.loginBtn}</Text>
             </TouchableOpacity>

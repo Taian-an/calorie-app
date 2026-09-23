@@ -6,6 +6,8 @@ import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { useUserData } from '../context/UserDataContext';
+import { useLanguage } from '../context/LanguageContext';
+import { authErrorMessage } from '../constants/authErrors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -25,6 +27,7 @@ export const GOOGLE_LOGIN_ENABLED = Platform.select({
 export default function GoogleAuthButton({ onError }) {
   const router = useRouter();
   const { loginWithGoogle } = useUserData();
+  const { t } = useLanguage();
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     webClientId:      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
@@ -45,7 +48,8 @@ export default function GoogleAuthButton({ onError }) {
     if (!response || response.type === 'dismiss' || response.type === 'cancel') return;
     if (response.type === 'error') {
       console.error('[google login] auth error:', response.error, response.params);
-      onError?.(response.params?.error_description ?? response.error?.message ?? 'Google 登入失敗（授權被拒絕）');
+      // Google 回傳的 error_description 是英文，而且是給開發者看的；使用者看翻譯過的訊息就好
+      onError?.(t.googleDenied);
       return;
     }
     if (response.type !== 'success') return;
@@ -53,7 +57,7 @@ export default function GoogleAuthButton({ onError }) {
       .then(() => router.replace('/(tabs)'))
       .catch(err => {
         console.error('[google login] backend call failed:', err);
-        onError?.(err.response?.data?.error ?? err.message ?? 'Google 登入失敗');
+        onError?.(authErrorMessage(err, t, 'googleFailed'));
       });
   }, [response]);
 
@@ -65,7 +69,7 @@ export default function GoogleAuthButton({ onError }) {
       activeOpacity={0.85}
     >
       <AntDesign name="google" size={17} color="#4285F4" />
-      <Text style={s.text}>通過 Google 繼續</Text>
+      <Text style={s.text}>{t.googleContinue}</Text>
     </TouchableOpacity>
   );
 }
