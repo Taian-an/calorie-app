@@ -23,6 +23,23 @@ export const GOOGLE_LOGIN_ENABLED = Platform.select({
   default: !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
 });
 
+// 網頁版被開在其他 App 內建的瀏覽器（微信、LINE、Facebook、Instagram…）時，Google 官方直接封鎖在這類
+// WebView 裡登入（disallowed_useragent），而且它們也不支援登入要用的彈出視窗——實測微信裡按下去會讓頁面
+// 一直重新載入、或 Google 通過後結果被丟掉。這不是我們能修的，只能請使用者改用系統瀏覽器開啟。
+const IN_APP_BROWSERS = [
+  [/MicroMessenger/i, '微信 WeChat'],
+  [/\bLine\//i, 'LINE'],
+  [/FBAN|FBAV|FB_IAB/i, 'Facebook'],
+  [/Instagram/i, 'Instagram'],
+  [/Messenger/i, 'Messenger'],
+];
+function detectInAppBrowser() {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined') return null;
+  const match = IN_APP_BROWSERS.find(([pattern]) => pattern.test(navigator.userAgent));
+  return match ? match[1] : null;
+}
+const IN_APP_BROWSER = detectInAppBrowser();
+
 // 登入頁、註冊頁共用的「通過 Google 繼續」按鈕：
 // 拿到 Google 的 id_token 後直接丟給後端 /auth/google，帳號不存在就自動建立，等同一鍵完成登入或註冊。
 export default function GoogleAuthButton({ onError }) {
@@ -62,16 +79,31 @@ export default function GoogleAuthButton({ onError }) {
       });
   }, [response]);
 
+  const handlePress = () => {
+    if (IN_APP_BROWSER) {
+      // 不呼叫 promptAsync：在這類瀏覽器裡一定失敗，還會讓頁面反覆重新載入
+      const msg = t.googleInAppMsg.replace('{app}', IN_APP_BROWSER);
+      window.alert(`${t.googleInAppTitle}\n\n${msg}`);
+      return;
+    }
+    promptAsync();
+  };
+
   return (
-    <TouchableOpacity
-      style={[s.btn, { outlineStyle: 'none' }]}
-      onPress={() => promptAsync()}
-      disabled={!request}
-      activeOpacity={0.85}
-    >
-      <AntDesign name="google" size={17} color="#4285F4" />
-      <Text style={s.text}>{t.googleContinue}</Text>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        style={[s.btn, IN_APP_BROWSER && s.btnDimmed, { outlineStyle: 'none' }]}
+        onPress={handlePress}
+        disabled={!request && !IN_APP_BROWSER}
+        activeOpacity={0.85}
+      >
+        <AntDesign name="google" size={17} color="#4285F4" />
+        <Text style={s.text}>{t.googleContinue}</Text>
+      </TouchableOpacity>
+      {IN_APP_BROWSER && (
+        <Text style={s.inAppHint}>{t.googleInAppHint.replace('{app}', IN_APP_BROWSER)}</Text>
+      )}
+    </>
   );
 }
 
@@ -82,4 +114,6 @@ const s = StyleSheet.create({
     paddingVertical: 13, backgroundColor: '#FFF',
   },
   text: { fontSize: 14.5, fontWeight: '700', color: '#1F2937' },
+  btnDimmed: { opacity: 0.55 },
+  inAppHint: { marginTop: 8, fontSize: 12.5, color: '#B45309', textAlign: 'center', lineHeight: 18 },
 });
