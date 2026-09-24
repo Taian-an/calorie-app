@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "calorie-app",
     "orientation": "portrait",
-    "icon": "./avatars/avatar.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "backgroundColor": "#16A34A"
@@ -20,13 +20,14 @@
     "android": {
       "package": "com.taianan.calorieapp",
       "adaptiveIcon": {
-        "backgroundColor": "#16A34A"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#87C699"
       }
     },
     "web": {
       "bundler": "metro",
       "output": "spa",
-      "favicon": "./avatars/avatar.png",
+      "favicon": "./assets/favicon.png",
       "baseUrl": "/calorie-app"
     },
     "plugins": [
