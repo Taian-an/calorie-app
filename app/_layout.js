@@ -1,3 +1,5 @@
+// 要最先載入：趁路由還沒把網址 #id_token 改掉之前讀取（見檔案內說明）
+import '../components/googleRedirectLogin';
 import { Stack } from 'expo-router';
 import { LanguageProvider } from '../context/LanguageContext';
 import { UserDataProvider, useUserData } from '../context/UserDataContext';

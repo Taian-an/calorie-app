@@ -2,12 +2,13 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform,
   ScrollView, Alert,
 } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../context/UserDataContext';
 import GoogleAuthButton, { GOOGLE_LOGIN_ENABLED } from '../components/GoogleAuthButton';
 import { authErrorMessage } from '../constants/authErrors';
+import { takePendingGoogleIdToken } from '../components/googleRedirectLogin';
 
 const C = {
   primary:       '#22C55E',
@@ -24,12 +25,23 @@ const C = {
 export default function LoginScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { login } = useUserData();
+  const { login, loginWithGoogle } = useUserData();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  // 手機瀏覽器 Google 登入的備援：這個分頁是 Google 驗證完導回來的，但沒辦法交還給原本的分頁，
+  // 就在這裡直接用拿到的 token 登入。成功後登入狀態一變，_layout 的路由守衛會自動帶進 App
+  useEffect(() => {
+    const idToken = takePendingGoogleIdToken();
+    if (!idToken) return;
+    setBusy(true);
+    loginWithGoogle(idToken)
+      .catch(err => setError(authErrorMessage(err, t, 'googleFailed')))
+      .finally(() => setBusy(false));
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) return;

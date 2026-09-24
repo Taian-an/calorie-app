@@ -9,7 +9,8 @@ import { useUserData } from '../context/UserDataContext';
 import { useLanguage } from '../context/LanguageContext';
 import { authErrorMessage } from '../constants/authErrors';
 
-WebBrowser.maybeCompleteAuthSession();
+// 彈出視窗導回時的交還（以及手機瀏覽器交還失敗時的備援）統一在 googleRedirectLogin 處理
+import './googleRedirectLogin';
 
 // 還沒去 Google Cloud Console 申請對應平台的 Client ID 前，Google.useIdTokenAuthRequest 一旦被呼叫就會
 // 直接 throw，所以由呼叫端（login.js / register.js）用這個旗標決定要不要 mount 這個元件，避免把整頁弄壞。
