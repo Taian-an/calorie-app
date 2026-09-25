@@ -316,7 +316,7 @@ export default function ProfileScreen() {
           <View style={s.card}>
             <Text style={s.cardTitle}>⚙️ {t.appSettings}</Text>
             <View style={s.divider} />
-            <SettingRow icon="language-outline" label={t.languageLabel} value={`${t.flag} ${t.name}`} onPress={() => setShowLangModal(true)} />
+            <SettingRow icon="language-outline" label={t.languageLabel} value={t.name} onPress={() => setShowLangModal(true)} />
             <SettingRow icon="contrast-outline" label={t.appearanceLabel} value={t.appearanceSystem} onPress={() => {}} />
             <SettingRow icon="notifications-outline" label={t.setNotify} onPress={() => {}} />
             <SettingRow icon="options-outline"  label={t.setUnits} onPress={() => {}} />
@@ -366,7 +366,6 @@ export default function ProfileScreen() {
                   onPress={() => { setLang(key); setShowLangModal(false); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={s.langOptionFlag}>{item.flag}</Text>
                   <Text style={[s.langOptionName, isActive && s.langOptionNameActive]}>
                     {item.name}
                   </Text>
@@ -736,7 +735,6 @@ const s = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   langOptionActive:     { backgroundColor: '#F0FDF4', borderWidth: 2, borderColor: C.primary },
-  langOptionFlag:       { fontSize: 24 },
   langOptionName:       { flex: 1, fontSize: 15, fontWeight: '600', color: C.textPrimary },
   langOptionNameActive: { color: C.primaryDark, fontWeight: '800' },
   langOptionCheck:      { fontSize: 16, color: C.primary, fontWeight: '800' },
