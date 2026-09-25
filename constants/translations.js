@@ -1,6 +1,6 @@
 const translations = {
   zh: {
-    flag: '🇹🇼', name: '繁體中文',
+    name: '繁體中文',
     appTitle: 'AI 卡路里追蹤', appSubtitle: '計算你的每日熱量需求',
     gender: '性別', male: '👨 男性', female: '👩 女性',
     basicInfo: '基本資料', age: '年齡', ageUnit: '歲',
@@ -152,7 +152,7 @@ const translations = {
     obBuilt: '計劃已制定完成！',
   },
   en: {
-    flag: '🇺🇸', name: 'English',
+    name: 'English',
     appTitle: 'AI Calorie Tracker', appSubtitle: 'Calculate your daily calorie needs',
     gender: 'Gender', male: '👨 Male', female: '👩 Female',
     basicInfo: 'Basic Info', age: 'Age', ageUnit: 'yr',
