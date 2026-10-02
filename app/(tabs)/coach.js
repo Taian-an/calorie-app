@@ -47,13 +47,16 @@ export default function CoachScreen() {
     try {
       const reply = await sendCoachMessage(history.map(({ role, text }) => ({ role, text })), lang);
       setMessages(prev => [...prev, { id: nextId(), role: 'model', text: reply }]);
-    } catch {
-      setMessages(prev => [...prev, { id: nextId(), role: 'model', text: t.coachError, isError: true }]);
+    } catch (err) {
+      // 429 daily_limit：今天的教練訊息額度用完了（免費版每天 5 則），其他錯誤顯示一般的暫時無法回應
+      const data = err.response?.data;
+      const text = data?.error === 'daily_limit' ? t.coachDailyLimit.replace('{n}', data.limit ?? 5) : t.coachError;
+      setMessages(prev => [...prev, { id: nextId(), role: 'model', text, isError: true }]);
     } finally {
       setSending(false);
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
     }
-  }, [input, sending, messages, sendCoachMessage, t.coachError, lang]);
+  }, [input, sending, messages, sendCoachMessage, t.coachError, t.coachDailyLimit, lang]);
 
   const handleClear = useCallback(() => {
     setMessages([{ id: nextId(), role: 'model', text: t.coachGreeting }]);

@@ -8,6 +8,11 @@ const API_BASE    = process.env.EXPO_PUBLIC_API_URL;
 
 const UserDataContext = createContext(null);
 
+// 每個 API 請求都帶手機的時區：後端的 AI 每日額度（免費版每天 5 次）以使用者「當地」的午夜重置
+try {
+  axios.defaults.headers.common['X-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
+} catch { /* 取不到就讓後端用 UTC */ }
+
 export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
 // 舊資料的 meal 沒有 mealType 欄位，一律當作點心，不做資料遷移
@@ -252,6 +257,7 @@ export function UserDataProvider({ children }) {
     getDayLog,
     getMealsByType,
     authEmail,
+    authHeaders, // 給 camera.js 等直接呼叫 API 的畫面帶登入 token（AI 辨識必須登入）
     register,
     login,
     loginWithGoogle,

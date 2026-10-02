@@ -45,7 +45,7 @@ function defaultMealType() {
 export default function DietCamera() {
   const { t, lang } = useLanguage();
   const router = useRouter();
-  const { profile, addMeal, getDayTotals } = useUserData();
+  const { profile, addMeal, getDayTotals, authHeaders } = useUserData();
   const { mealType: mealTypeParam, autoPick, manual } = useLocalSearchParams();
   const mealType = MEAL_TYPES.includes(mealTypeParam) ? mealTypeParam : defaultMealType();
 
@@ -273,7 +273,7 @@ export default function DietCamera() {
       // 後端會在同一個 request 裡等辨識做完（一般 3~4 秒），做完就直接回 status:'done' + 結果；
       // 只有佇列塞車等不到時才回 202 + analysisId，這時再改用 pollAnalysis 輪詢
       const { data } = await axios.post(`${API_BASE}/analyze`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data', ...authHeaders() },
         timeout: 20000, // 上傳 + 後端最多等 8 秒辨識，網路慢的時候上傳本身也要幾秒
       });
       if (data.status === 'done') {
@@ -289,7 +289,7 @@ export default function DietCamera() {
       } else if (!error.response) {
         showError(t.camNoServer);
       } else {
-        showError(analysisErrorMessage(error.response?.data?.error));
+        showError(analysisErrorMessage(error.response?.data?.error, error.response?.data));
       }
       setLoading(false);
     }
@@ -304,7 +304,7 @@ export default function DietCamera() {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < MAX_WAIT_MS) {
-      const { data } = await axios.get(`${API_BASE}/analyses/${analysisId}`);
+      const { data } = await axios.get(`${API_BASE}/analyses/${analysisId}`, { headers: authHeaders() });
       if (data.status === 'done') {
         setResult(data);
         setLoading(false);
@@ -346,8 +346,11 @@ export default function DietCamera() {
   };
 
   // 後端的錯誤訊息是給開發者看的（中英混雜、含模型名稱），畫面上一律換成目前語言的友善訊息
-  const analysisErrorMessage = (serverError) =>
-    serverError === 'No food data found' ? t.camNoFood : t.camAnalysisFailed;
+  // daily_limit：今天的 AI 辨識額度用完了（免費版每天 5 次，當地午夜重置）
+  const analysisErrorMessage = (serverError, data) => {
+    if (serverError === 'daily_limit') return t.camDailyLimit.replace('{n}', data?.limit ?? 5);
+    return serverError === 'No food data found' ? t.camNoFood : t.camAnalysisFailed;
+  };
 
   const showError = (message) => {
     if (Platform.OS === 'web') {
