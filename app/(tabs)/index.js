@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
-import { useUserData, dateKey, MEAL_TYPES } from '../../context/UserDataContext';
+import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
 
 const C = {
   primary:       '#22C55E',
@@ -116,9 +116,7 @@ function getMonthCells(year, month) {
   const startDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0 = 週一
   const cells = Array(startDow).fill(null);
   for (let day = 1; day <= daysInMonth; day++) {
-    const d = new Date();
-    d.setFullYear(year, month, day);
-    cells.push({ day, key: d.toISOString().slice(0, 10) });
+    cells.push({ day, key: dateKeyOf(new Date(year, month, day)) });
   }
   return cells;
 }

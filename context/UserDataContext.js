@@ -20,8 +20,10 @@ function normalizeMealType(type) {
   return MEAL_TYPES.includes(type) ? type : 'snacks';
 }
 
+// 一天以使用者當地日期為準（見 GLOSSARY.md「Day」、docs/adr/0002）；以前用 toISOString 是 UTC，台灣早上 8 點前的紀錄會落到前一天
 export function dateKeyOf(date) {
-  return date.toISOString().slice(0, 10); // YYYY-MM-DD
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; // YYYY-MM-DD
 }
 
 export function dateKey(offsetDays = 0) {
