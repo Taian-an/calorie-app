@@ -74,7 +74,7 @@ The default plan. AI Analyses and coach messages are limited by a daily allowanc
 The paid plan. AI Analyses and coach messages are unlimited to the user, subject only to the fair-use cap. Described publicly as "unlimited (fair use)".
 
 **Subscription**:
-A recurring purchase made through Google Play that gives a user Premium while it is active. One of two ways to get Premium.
+A recurring purchase made in the Android app through Google Play that gives a user Premium while it is active, wherever they sign in, including the web app. One of two ways to get Premium.
 _Avoid_: Using "subscription" to mean Premium itself
 
 **Grant**:

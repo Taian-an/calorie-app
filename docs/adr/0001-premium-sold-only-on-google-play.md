@@ -6,3 +6,4 @@ Calorie Tracks launches on Google Play only (iOS deferred), and Premium is sold 
 
 - iPhone users can use the web app but cannot buy Premium until an iOS release adds App Store purchases.
 - Adding web checkout later means a second purchase source that must merge with Google Play and Grants into one Premium state.
+- Selling on the web was reconsidered and deferred. Stripe does not accept Taiwan-based sellers, so RevenueCat's Stripe-based web billing is not an option; Paddle (merchant of record, has a RevenueCat integration) is the likely route if web checkout is added.
