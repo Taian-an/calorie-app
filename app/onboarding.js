@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
-import { useUserData } from '../context/UserDataContext';
+import { useUserData, dateKey } from '../context/UserDataContext';
+import { calcBmr, activityFactor, GOAL_DELTAS } from '../constants/bodyCalc';
 
 const C = {
   primary:       '#22C55E',
@@ -58,14 +59,10 @@ export default function OnboardingScreen() {
   // 按最後一步的「完成」：先算好結果，進入建立動畫，動畫跑完才真的存檔放行
   const startBuilding = () => {
     const w = weight, h = height, a = age;
-    const bmr = gender === 'male'
-      ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * a
-      : 447.593 + 9.247 * w + 3.098 * h - 4.330 * a;
-    const factor = t.activities.find(l => l.key === activity).factor;
-    const tdee = bmr * factor;
+    const bmr = calcBmr(gender, w, h, a);
+    const tdee = bmr * activityFactor(activity);
     const goal = targetWeight > weight + 0.3 ? 'bulk' : targetWeight < weight - 0.3 ? 'cut' : 'maintain';
-    const delta = goal === 'bulk' ? 300 : goal === 'cut' ? -400 : 0;
-    setResult({ age: a, gender, height: h, weight: w, activity, bmr, tdee, goal, target: tdee + delta });
+    setResult({ age: a, ageSetAt: dateKey(), gender, height: h, weight: w, activity, bmr, tdee, goal, target: tdee + GOAL_DELTAS[goal] });
     setPhase('building');
   };
 
@@ -105,7 +102,11 @@ export default function OnboardingScreen() {
             <Text style={s.title}>{t.obGenderTitle}</Text>
             <Text style={s.subtitle}>{t.obGenderSub}</Text>
             <View style={s.genderRow}>
-              {[{ key: 'male', label: t.obMale, emoji: '🙋‍♂️' }, { key: 'female', label: t.obFemale, emoji: '🙋‍♀️' }].map(g => (
+              {[
+                { key: 'male', label: t.obMale, emoji: '🙋‍♂️' },
+                { key: 'female', label: t.obFemale, emoji: '🙋‍♀️' },
+                { key: 'other', label: t.obOther, emoji: '🙋' },
+              ].map(g => (
                 <TouchableOpacity
                   key={g.key}
                   style={[s.genderCard, gender === g.key && s.genderCardActive]}
@@ -117,6 +118,7 @@ export default function OnboardingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            {gender === 'other' && <Text style={s.genderNote}>{t.genderOtherNote}</Text>}
           </>
         )}
 
@@ -368,14 +370,15 @@ const s = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '900', color: C.textPrimary, marginBottom: 8 },
   subtitle: { fontSize: 14, color: C.textSecondary, marginBottom: 32, lineHeight: 20 },
 
-  genderRow: { flexDirection: 'row', gap: 14, marginTop: 8 },
+  genderRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   genderCard: {
     flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 16,
     paddingVertical: 32, alignItems: 'center', backgroundColor: C.card,
   },
   genderCardActive: { borderColor: C.primary, backgroundColor: '#F0FDF4' },
   genderEmoji: { fontSize: 40, marginBottom: 10 },
-  genderLabel: { fontSize: 16, fontWeight: '700', color: C.textSecondary },
+  genderLabel: { fontSize: 16, fontWeight: '700', color: C.textSecondary, textAlign: 'center' },
+  genderNote: { fontSize: 13, color: C.textSecondary, marginTop: 16, lineHeight: 19 },
   genderLabelActive: { color: C.primaryDark },
 
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28, marginTop: 24 },

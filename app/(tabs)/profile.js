@@ -8,7 +8,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
-import { useUserData } from '../../context/UserDataContext';
+import { useUserData, dateKey } from '../../context/UserDataContext';
+import { calcBmr, activityFactor, GOAL_DELTAS } from '../../constants/bodyCalc';
 import translations, { LANG_KEYS } from '../../constants/translations';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
@@ -179,18 +180,16 @@ export default function ProfileScreen() {
   const handleSave = () => {
     if (!age || !height || !weight) return;
     const w = parseFloat(weight), h = parseFloat(height), a = parseFloat(age);
-    const bmr = gender === 'male'
-      ? 88.362 + 13.397 * w + 4.799 * h - 5.677 * a
-      : 447.593 + 9.247 * w + 3.098 * h - 4.330 * a;
-    const factor = t.activities.find(l => l.key === activity).factor;
-    const tdee = bmr * factor;
+    const bmr = calcBmr(gender, w, h, a);
+    const tdee = bmr * activityFactor(activity);
     // 保留首頁選的目標模式（增肌/減脂/維持），依新 TDEE 重算目標熱量
     const goal = profile?.goal ?? 'maintain';
-    const delta = goal === 'bulk' ? 300 : goal === 'cut' ? -400 : 0;
+    // 年齡有改才重設起算日；沒改就沿用，不然每次編輯都會把「滿一年 +1 歲」的計時歸零
+    const ageSetAt = a === profile?.age && profile?.ageSetAt ? profile.ageSetAt : dateKey();
     updateProfile({
       name: name.trim(), avatarKey,
-      age: a, gender, height: h, weight: w, activity, bmr, tdee,
-      goal, target: tdee + delta,
+      age: a, ageSetAt, gender, height: h, weight: w, activity, bmr, tdee,
+      goal, target: tdee + (GOAL_DELTAS[goal] ?? 0),
     });
     setShowEditModal(false);
   };
@@ -267,7 +266,7 @@ export default function ProfileScreen() {
 
   const bmi = profile.weight / Math.pow(profile.height / 100, 2);
   const bmiData = bmiInfo(bmi, t);
-  const genderLabel = (profile.gender === 'male' ? t.male : t.female)?.replace(/^[^\s]+\s/, '');
+  const genderLabel = (profile.gender === 'male' ? t.male : profile.gender === 'female' ? t.female : t.genderOther)?.replace(/^[^\s]+\s/, '');
 
   return (
     <SafeAreaView style={s.safe}>
@@ -447,17 +446,19 @@ export default function ProfileScreen() {
 
             {infoModal === 'bmr' && (() => {
               const isMale = profile.gender === 'male';
+              const isOther = profile.gender !== 'male' && profile.gender !== 'female';
+              const maleLine = `88.362 + 13.397×${profile.weight} + 4.799×${profile.height} − 5.677×${profile.age}`;
+              const femaleLine = `447.593 + 9.247×${profile.weight} + 3.098×${profile.height} − 4.330×${profile.age}`;
               return (
                 <>
                   <Text style={s.modalTitle}>{t.bmrFormulaTitle}</Text>
-                  <Text style={[s.formulaText, isMale && s.formulaTextActive]}>{t.bmrFormulaMale}</Text>
+                  <Text style={[s.formulaText, (isMale || isOther) && s.formulaTextActive]}>{t.bmrFormulaMale}</Text>
                   <Text style={[s.formulaText, !isMale && s.formulaTextActive]}>{t.bmrFormulaFemale}</Text>
+                  {isOther && <Text style={[s.formulaText, s.formulaTextActive]}>{t.bmrFormulaOther}</Text>}
                   <View style={s.formulaDivider} />
                   <Text style={s.formulaSubLabel}>{t.yourNumbers}</Text>
                   <Text style={s.formulaSub}>
-                    {isMale
-                      ? `88.362 + 13.397×${profile.weight} + 4.799×${profile.height} − 5.677×${profile.age}`
-                      : `447.593 + 9.247×${profile.weight} + 3.098×${profile.height} − 4.330×${profile.age}`}
+                    {isOther ? `( ${maleLine} + ${femaleLine} ) ÷ 2` : isMale ? maleLine : femaleLine}
                   </Text>
                   <Text style={s.formulaResult}>= {Math.round(profile.bmr).toLocaleString()} kcal</Text>
                 </>
@@ -541,7 +542,7 @@ function EditProfileModal({
             {/* 性別 */}
             <Text style={[s.sectionLabel, { marginTop: 16 }]}>{t.gender}</Text>
             <View style={s.toggleRow}>
-              {[['male', t.male], ['female', t.female]].map(([key, label]) => (
+              {[['male', t.male], ['female', t.female], ['other', t.genderOther]].map(([key, label]) => (
                 <TouchableOpacity
                   key={key}
                   style={[s.toggleBtn, gender === key && s.toggleBtnActive]}
@@ -551,6 +552,7 @@ function EditProfileModal({
                 </TouchableOpacity>
               ))}
             </View>
+            {gender === 'other' && <Text style={s.genderNote}>{t.genderOtherNote}</Text>}
 
             {/* 年齡 */}
             <Text style={[s.sectionLabel, { marginTop: 16 }]}>{t.age}</Text>
@@ -775,6 +777,7 @@ const s = StyleSheet.create({
   },
 
   toggleRow:        { flexDirection: 'row', gap: 10 },
+  genderNote:       { fontSize: 12, color: C.textSecondary, marginTop: 8, lineHeight: 17 },
   toggleBtn:        { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 2, borderColor: C.border, alignItems: 'center' },
   toggleBtnActive:  { borderColor: C.primary, backgroundColor: '#F0FDF4' },
   toggleText:       { fontSize: 15, fontWeight: '700', color: C.textSecondary },

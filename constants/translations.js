@@ -143,7 +143,7 @@ const translations = {
     noAccount: '還沒有帳號？', signUpLink: '註冊', createAccount: '建立帳號',
     firstName: '名字', lastName: '姓氏', usernameLabel: '使用者名稱', haveAccount: '已經有帳號了？',
     camGalleryShort: '相簿',
-    obGenderTitle: '選擇你的性別', obGenderSub: '男性的基礎代謝率通常比女性更高。',
+    obGenderTitle: '選擇你的性別', obGenderSub: '男性的基礎代謝率通常比女性更高。不想透露也可以選「其他」。',
     obAgeTitle: '你的年齡是？', obAgeSub: '隨著年齡增長，基礎代謝會逐漸下降。點數字可以直接輸入。',
     obHeightTitle: '你的身高是多少？', obWeightTitle: '你目前的體重是？',
     obBodySub: '身高和體重是決定基礎代謝率的重要指標。點數字可以直接輸入。',
@@ -153,6 +153,10 @@ const translations = {
     obActivityTitle: '你的活動量如何？', obActivitySub: '這會用來估算你的每日熱量消耗。',
     obBuilding: '正在為你打造專屬計劃…', obBuildingSub: '根據你的資料計算每日熱量與營養素目標',
     obBuilt: '計劃已制定完成！',
+    // ── 性別「其他」──
+    genderOther: '🧑 其他', obOther: '其他 / 不透露',
+    genderOtherNote: '沒問題，不透露也能使用。熱量公式本身分男女，所以會取兩者的平均來算，結果可能有些誤差。',
+    bmrFormulaOther: '其他 / 不透露：取男性和女性公式的平均',
   },
   en: {
     name: 'English',
@@ -298,7 +302,7 @@ const translations = {
     noAccount: "Don't have an account?", signUpLink: 'Sign Up', createAccount: 'Create Account',
     firstName: 'First Name', lastName: 'Last Name', usernameLabel: 'Username', haveAccount: 'Already have an account?',
     camGalleryShort: 'Photos',
-    obGenderTitle: "What's your sex?", obGenderSub: 'Men usually have a higher basal metabolic rate than women.',
+    obGenderTitle: "What's your sex?", obGenderSub: "Men usually have a higher basal metabolic rate than women. You can also choose \"Other\" if you'd rather not say.",
     obAgeTitle: 'How old are you?', obAgeSub: 'Metabolism slows gradually with age. Tap the number to type it.',
     obHeightTitle: 'How tall are you?', obWeightTitle: 'What do you weigh now?',
     obBodySub: 'Height and weight are key to your basal metabolic rate. Tap the number to type it.',
@@ -308,6 +312,10 @@ const translations = {
     obActivityTitle: 'How active are you?', obActivitySub: "We'll use this to estimate how many calories you burn each day.",
     obBuilding: 'Building your personal plan…', obBuildingSub: 'Calculating your daily calorie and nutrient targets',
     obBuilt: 'Your plan is ready!',
+    // ── "Other" gender ──
+    genderOther: '🧑 Other', obOther: 'Other / Prefer not to say',
+    genderOtherNote: "No problem — you can use the app without saying. The calorie formula is split by sex, so we'll use the average of both, which may be a little less accurate.",
+    bmrFormulaOther: 'Other / prefer not to say: the average of the male and female formulas',
   },
 };
 

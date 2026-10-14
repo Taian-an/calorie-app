@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { agedProfile } from '../constants/bodyCalc';
 
 const STORAGE_KEY = '@calorie_app_user_data';
 const AUTH_KEY    = '@calorie_app_auth';
@@ -180,6 +181,7 @@ export function UserDataProvider({ children }) {
           ...(prevLogs[today] ?? { meals: [] }),
           weight: newProfile.weight,
           tdee: newProfile.tdee,
+          target: newProfile.target, // 每天保留當天適用的目標熱量（GLOSSARY「Target」），之後改目標不會改寫過去
         },
       };
       persist(newProfile, nextLogs);
@@ -189,6 +191,13 @@ export function UserDataProvider({ children }) {
     setProfile(newProfile);
     syncProfileUp(newProfile);
   }, [persist, syncDayUp, syncProfileUp]);
+
+  // 年齡每滿一年自動 +1，並重算 BMR / TDEE / 目標熱量（見 constants/bodyCalc.js 的 agedProfile）
+  useEffect(() => {
+    if (!loaded || !authEmail || !profile) return;
+    const next = agedProfile(profile, dateKey());
+    if (next) updateProfile(next);
+  }, [loaded, authEmail, profile, updateProfile]);
 
   // 拍照分析完的一餐記進日誌。atTimestamp 預設是「現在」，但呼叫端可以帶「送出辨識當下」的時間戳，
   // 這樣即使 AI 辨識/使用者確認花了好幾分鐘、甚至跨過午夜，記錄的日期還是跟著拍照那一刻走，不會跳到隔天
