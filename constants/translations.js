@@ -157,6 +157,20 @@ const translations = {
     genderOther: '🧑 其他', obOther: '其他 / 不透露',
     genderOtherNote: '沒問題，不透露也能使用。熱量公式本身分男女，所以會取兩者的平均來算，結果可能有些誤差。',
     bmrFormulaOther: '其他 / 不透露：取男性和女性公式的平均',
+    // ── 日誌頁建議卡片 ──
+    tipFullTitle: '今天的熱量目標已經吃滿了',
+    tipOverTitle: '今天已經超出目標 {n} kcal',
+    tipFullBody: '沒關係，偶爾多吃一點很正常。還餓的話，選低熱量又有飽足感的：蔬菜、清湯、無糖茶、雞胸肉或豆腐。多吃的部分明天會建議你分幾天慢慢補回來，不用餓肚子。',
+    tipFullAsk: '我今天的熱量已經吃完了，但還有點餓，接下來可以吃什麼？',
+    tipYesterdayTitle: '昨天多吃了 {n} kcal',
+    tipCatchUpBody: '建議接下來 {d} 天，每天少吃約 {p} kcal（今天大約吃 {a} kcal），就能把昨天多的慢慢補回來，不用一次餓肚子。多走路、運動也有幫助。',
+    tipCatchUpMoveBody: '你的目標熱量已經接近安全下限，不建議再少吃。可以多走路或運動，把多的消耗掉。',
+    tipCatchUpAsk: '我昨天比目標多吃了 {n} kcal，接下來幾天要怎麼調整才能達到我的目標？',
+    tipAskCoach: '問 AI 教練',
+    // ── 預估體重 ──
+    estWeightTitle: '預估體重',
+    estWeightBody: '從你 {date} 量的 {w} kg 起算，之後有記錄的 {d} 天累計熱量 {net} kcal（約 7700 kcal ≈ 1 kg）。這只是估算，量了實際體重後記得更新，會從那天重新算。',
+    estWeightUpdate: '更新體重',
   },
   en: {
     name: 'English',
@@ -316,6 +330,20 @@ const translations = {
     genderOther: '🧑 Other', obOther: 'Other / Prefer not to say',
     genderOtherNote: "No problem — you can use the app without saying. The calorie formula is split by sex, so we'll use the average of both, which may be a little less accurate.",
     bmrFormulaOther: 'Other / prefer not to say: the average of the male and female formulas',
+    // ── Diary tip cards ──
+    tipFullTitle: "You've reached today's calorie target",
+    tipOverTitle: "You're {n} kcal over today's target",
+    tipFullBody: "That's okay — eating a bit more now and then is normal. If you're still hungry, pick filling, low-calorie foods: vegetables, clear soup, unsweetened tea, chicken breast or tofu. Tomorrow we'll suggest spreading the extra over a few days, so you won't need to go hungry.",
+    tipFullAsk: "I've used up today's calories but I'm still a bit hungry. What can I eat?",
+    tipYesterdayTitle: 'You ate {n} kcal more than your target yesterday',
+    tipCatchUpBody: 'Try eating about {p} kcal less for the next {d} days (about {a} kcal today) to make it up gradually, without going hungry. Extra walking or exercise helps too.',
+    tipCatchUpMoveBody: "Your target is already close to a safe minimum, so we don't suggest eating less. Some extra walking or exercise will burn it off.",
+    tipCatchUpAsk: 'Yesterday I ate {n} kcal more than my target. How should I adjust the next few days to reach my goal?',
+    tipAskCoach: 'Ask the AI coach',
+    // ── Estimated weight ──
+    estWeightTitle: 'Estimated weight',
+    estWeightBody: 'Starting from {w} kg on {date}, your {d} logged days since add up to {net} kcal against your TDEE (about 7,700 kcal ≈ 1 kg). This is only an estimate — when you weigh yourself, update your weight and we will start again from there.',
+    estWeightUpdate: 'Update weight',
   },
 };
 

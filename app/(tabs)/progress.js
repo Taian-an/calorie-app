@@ -2,6 +2,7 @@ import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity,
 } from 'react-native';
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, MICRO_KEYS } from '../../context/UserDataContext';
 
@@ -65,6 +66,7 @@ function DayBar({ label, totals, scaleMax, isToday }) {
 
 export default function ProgressScreen() {
   const { t } = useLanguage();
+  const router = useRouter();
   const { profile, dailyLogs, getDayTotals } = useUserData();
   const [selectedRange, setSelectedRange] = useState('1w');
 
@@ -134,6 +136,22 @@ export default function ProgressScreen() {
     : profile?.goal === 'bulk' ? weightDelta >= 0
     : profile?.goal === 'cut'  ? weightDelta <= 0
     : Math.abs(weightDelta) < 2;
+  // 預估體重：從最後一次量的體重開始，把之後每天「吃的 − TDEE」累加，約 7700 kcal ≈ 1 kg。
+  // 今天還沒吃完不算；沒記錄的天數不知道吃了多少，也不算。使用者一更新體重（寫進當天日誌）就從那天重新起算
+  const lastWeighKey = weightKeys.length ? weightKeys[weightKeys.length - 1] : null;
+  const todayKey = dateKey();
+  const estimate = lastWeighKey && profile?.tdee ? (() => {
+    const keys = trackedKeys.filter(k => k > lastWeighKey && k < todayKey);
+    if (!keys.length) return null;
+    const net = keys.reduce((sum, k) => sum + getDayTotals(k).energy - profile.tdee, 0);
+    const base = dailyLogs[lastWeighKey].weight;
+    return {
+      base, baseLabel: lastWeighKey.slice(5).replace('-', '/'), days: keys.length,
+      net: Math.round(net), weight: Math.round((base + net / 7700) * 10) / 10,
+      delta: Math.round((net / 7700) * 10) / 10,
+    };
+  })() : null;
+
   const maxEnergy = Math.max(1, goal ?? 0, ...days.map(d => d.totals?.energy ?? 0));
   const goalLineTop = goal != null ? CHART_HEIGHT - Math.min(goal / maxEnergy, 1) * CHART_HEIGHT : null;
 
@@ -276,6 +294,29 @@ export default function ProgressScreen() {
           )}
         </View>
 
+        {/* ── 依飲食紀錄預估的體重 ── */}
+        {estimate && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>🔮 {t.estWeightTitle}</Text>
+            <Text style={s.estValue}>
+              {estimate.weight} <Text style={s.avgUnit}>kg</Text>
+              <Text style={[s.weightDelta, { color: C.textSecondary }]}>
+                {'  '}{estimate.delta > 0 ? '+' : ''}{estimate.delta} kg
+              </Text>
+            </Text>
+            <Text style={s.estBody}>
+              {t.estWeightBody
+                .replace('{date}', estimate.baseLabel)
+                .replace('{w}', estimate.base)
+                .replace('{d}', estimate.days)
+                .replace('{net}', `${estimate.net > 0 ? '+' : ''}${estimate.net}`)}
+            </Text>
+            <TouchableOpacity style={s.estBtn} onPress={() => router.push('/profile')} activeOpacity={0.8}>
+              <Text style={s.estBtnText}>{t.estWeightUpdate}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {!profile ? (
           <View style={s.card}>
             <Text style={s.noDataText}>{t.noDataYet}</Text>
@@ -406,6 +447,13 @@ const s = StyleSheet.create({
   adherenceHint:    { fontSize: 10, color: C.textSecondary, marginTop: 5 },
 
   weightRow:   { marginTop: 16, gap: 4 },
+  estValue:    { fontSize: 24, fontWeight: '900', color: C.textPrimary, marginTop: 8 },
+  estBody:     { fontSize: 12, color: C.textSecondary, lineHeight: 18, marginTop: 6 },
+  estBtn: {
+    alignSelf: 'flex-start', marginTop: 10, paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 999, backgroundColor: C.bg,
+  },
+  estBtnText:  { fontSize: 12, fontWeight: '700', color: C.primaryDark },
   weightText:  { fontSize: 15, fontWeight: '800', color: C.textPrimary, marginTop: 2 },
   weightDelta: { fontSize: 14, fontWeight: '900' },
 

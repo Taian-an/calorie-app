@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
+import { catchUpPlan } from '../../constants/bodyCalc';
 
 const C = {
   primary:       '#22C55E',
@@ -363,6 +364,19 @@ export default function DiaryScreen() {
   // 剩餘 = 目標 − 已攝取（＋運動消耗，Burned 尚無資料來源，待 Metrics 模組加入）
   const left = goal != null ? Math.round(goal - totals.energy) : null;
 
+  // 只在看「今天」時給建議：
+  // 1) 今天已經吃滿目標 → 告訴使用者接下來怎麼辦（還餓的話吃什麼、多的會分幾天補回來）
+  // 2) 昨天吃超過目標 → 建議接下來幾天每天少吃一點，慢慢補回來
+  const isToday = selectedKey === todayKey;
+  const fullToday = isToday && left != null && totals.energy > 0 && left <= 0;
+  const yesterdayKey = dateKey(-1);
+  const yesterdayTotals = getDayTotals(yesterdayKey);
+  const yesterdayTarget = dailyLogs[yesterdayKey]?.target ?? goal;
+  const catchUp = isToday && yesterdayTotals && yesterdayTarget != null
+    ? catchUpPlan(yesterdayTotals.energy - yesterdayTarget, goal)
+    : null;
+  const askCoach = (q) => router.push({ pathname: '/coach', params: { q } });
+
   // 三大營養素目標克數：與 profile 頁一致，固定 20/50/30 比例
   const macroTargets = goal != null ? {
     protein: Math.round((goal * 0.20) / 4),
@@ -464,6 +478,41 @@ export default function DiaryScreen() {
             </View>
           )}
         </View>
+
+        {/* 吃滿目標 / 昨天吃超過：給下一步的建議 */}
+        {fullToday && (
+          <View style={[s.tipCard, s.tipCardWarn]}>
+            <Text style={s.tipTitle}>
+              {left === 0 ? t.tipFullTitle : t.tipOverTitle.replace('{n}', Math.abs(left))}
+            </Text>
+            <Text style={s.tipBody}>{t.tipFullBody}</Text>
+            <TouchableOpacity style={s.tipBtn} onPress={() => askCoach(t.tipFullAsk)} activeOpacity={0.8}>
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color={C.primaryDark} />
+              <Text style={s.tipBtnText}>{t.tipAskCoach}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {catchUp && (
+          <View style={s.tipCard}>
+            <Text style={s.tipTitle}>{t.tipYesterdayTitle.replace('{n}', catchUp.surplus)}</Text>
+            <Text style={s.tipBody}>
+              {catchUp.perDay > 0
+                ? t.tipCatchUpBody
+                    .replace('{d}', catchUp.days)
+                    .replace('{p}', catchUp.perDay)
+                    .replace('{a}', catchUp.adjusted)
+                : t.tipCatchUpMoveBody}
+            </Text>
+            <TouchableOpacity
+              style={s.tipBtn}
+              onPress={() => askCoach(t.tipCatchUpAsk.replace('{n}', catchUp.surplus))}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color={C.primaryDark} />
+              <Text style={s.tipBtnText}>{t.tipAskCoach}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* 餐次列表 */}
         {MEAL_TYPES.map(type => (
@@ -817,6 +866,19 @@ const s = StyleSheet.create({
     fontSize: 11, fontWeight: '700', color: C.textSecondary,
     textTransform: 'uppercase', letterSpacing: 1,
   },
+  /* 建議卡片（吃滿目標 / 昨天吃超過） */
+  tipCard: {
+    backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12,
+    borderLeftWidth: 4, borderLeftColor: C.primary,
+  },
+  tipCardWarn: { borderLeftColor: C.ringOver },
+  tipTitle: { fontSize: 14, fontWeight: '800', color: C.textPrimary, marginBottom: 6 },
+  tipBody:  { fontSize: 13, color: C.textSecondary, lineHeight: 19 },
+  tipBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: C.bg,
+  },
+  tipBtnText: { fontSize: 12, fontWeight: '700', color: C.primaryDark },
   noDataText: { fontSize: 13, color: C.textSecondary, fontStyle: 'italic', textAlign: 'center' },
 
   /* 熱量圓環 */

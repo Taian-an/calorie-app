@@ -45,13 +45,19 @@ Where an Entry's nutrition came from: an AI Analysis, a barcode product from Ope
 ## Coach
 
 **Coach**:
-The AI nutrition and fitness coach the user chats with. It knows the user's Profile, Target and today's Entries. Conversations are not kept.
+The AI nutrition and fitness coach the user chats with. It knows the user's Profile, Target, today's Entries and the past four weeks of Days (intake against each Day's Target, and weight), so its advice looks at the trend rather than one day. Conversations are not kept.
 _Avoid_: Chatbot, assistant
 
 **Coach message**:
 One message the user sends to the Coach. Each one that gets a reply uses one of the day's allowance; the Coach's replies do not.
 
 ## Goals
+
+**Estimated weight**:
+The weight the app expects from the user's logged intake since their last weigh-in (intake minus TDEE, about 7,700 kcal per kg). Shown alongside, never written over, the weight the user records.
+
+**Catch-up**:
+The suggestion shown after a Day over its Target: eat a little less (at most 400 kcal a day, never below 1,200 kcal) over the next few Days. It is advice only and does not change the Target.
 
 **Goal**:
 The direction the user is working towards: lose fat, build muscle, or maintain weight.

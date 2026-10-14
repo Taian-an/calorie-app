@@ -3,7 +3,8 @@ import {
   StyleSheet, SafeAreaView, FlatList, KeyboardAvoidingView,
   Platform, ActivityIndicator,
 } from 'react-native';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData } from '../../context/UserDataContext';
@@ -32,6 +33,15 @@ export default function CoachScreen() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
+
+  // 日誌頁的建議卡片點「問教練」會帶 q 進來：先填進輸入框，讓使用者看過、可以改，再自己按送出
+  const { q } = useLocalSearchParams();
+  const router = useRouter();
+  useEffect(() => {
+    if (!q) return;
+    setInput(String(q));
+    router.setParams({ q: undefined });
+  }, [q]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();

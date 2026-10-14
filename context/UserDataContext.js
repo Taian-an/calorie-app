@@ -192,12 +192,16 @@ export function UserDataProvider({ children }) {
     syncProfileUp(newProfile);
   }, [persist, syncDayUp, syncProfileUp]);
 
-  // 年齡每滿一年自動 +1，並重算 BMR / TDEE / 目標熱量（見 constants/bodyCalc.js 的 agedProfile）
+  // 年齡每滿一年自動 +1，並重算 BMR / TDEE / 目標熱量（見 constants/bodyCalc.js 的 agedProfile）。
+  // 只改 profile，不走 updateProfile：那個會把今天記成「量過體重」，預估體重就會被歸零重算
   useEffect(() => {
     if (!loaded || !authEmail || !profile) return;
     const next = agedProfile(profile, dateKey());
-    if (next) updateProfile(next);
-  }, [loaded, authEmail, profile, updateProfile]);
+    if (!next) return;
+    setProfile(next);
+    persist(next, dailyLogs);
+    syncProfileUp(next);
+  }, [loaded, authEmail, profile, dailyLogs, persist, syncProfileUp]);
 
   // 拍照分析完的一餐記進日誌。atTimestamp 預設是「現在」，但呼叫端可以帶「送出辨識當下」的時間戳，
   // 這樣即使 AI 辨識/使用者確認花了好幾分鐘、甚至跨過午夜，記錄的日期還是跟著拍照那一刻走，不會跳到隔天
