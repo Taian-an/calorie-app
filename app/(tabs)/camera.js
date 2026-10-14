@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
+import MealPicker from '../../components/MealPicker';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
 const MAX_PHOTOS = 5; // 跟後端 multer 的 upload.array('images', 5) 上限一致
@@ -47,7 +48,9 @@ export default function DietCamera() {
   const router = useRouter();
   const { profile, addMeal, getDayTotals, authHeaders } = useUserData();
   const { mealType: mealTypeParam, autoPick, manual } = useLocalSearchParams();
-  const mealType = MEAL_TYPES.includes(mealTypeParam) ? mealTypeParam : defaultMealType();
+  // 使用者在結果卡上改過餐次就用改過的，否則用首頁帶進來的（或依時段判斷）
+  const [mealOverride, setMealOverride] = useState(null);
+  const mealType = mealOverride ?? (MEAL_TYPES.includes(mealTypeParam) ? mealTypeParam : defaultMealType());
 
   // 預覽圖上限跟著螢幕寬度走：手機螢幕窄，跟著縮小；平板/桌機螢幕寬，也不要無限放大，抓個上限。
   // 高度直接算成明確的 px 數值、不要靠 CSS aspect-ratio 撐——部分手機瀏覽器的 WebView 對
@@ -123,6 +126,7 @@ export default function DietCamera() {
       setResult(null);
       setLogged(false);
       setDescription('');
+      setMealOverride(null);
       const isManual = manual === '1';
       setManualEntry(isManual);
       if (isManual) {
@@ -456,6 +460,7 @@ export default function DietCamera() {
               <View style={styles.resultCard}>
                 <Text style={styles.resultTitle}>🍽️ {result.name}{result.grams ? t.camApprox.replace('{g}', result.grams) : ''}</Text>
                 <Text style={styles.resultText}>📒 {logged ? t.loggedToMeal : t.willLogToMeal}: {t[mealType]}</Text>
+                {!logged && <MealPicker value={mealType} onChange={setMealOverride} t={t} dark />}
                 <Text style={styles.resultText}>{t.camEnergyLine}: {result.energy} kcal</Text>
                 <Text style={styles.resultText}>{t.camMacroLine.replace('{p}', result.protein).replace('{c}', result.carbs).replace('{f}', result.fat)}</Text>
                 {result.items?.length > 1 && (

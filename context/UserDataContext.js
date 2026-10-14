@@ -222,6 +222,20 @@ export function UserDataProvider({ children }) {
     });
   }, [persist, profile, syncDayUp]);
 
+  // 把某一天的一筆食物紀錄移到同一天的另一個餐次（日記頁長按拖曳用）
+  const moveMeal = useCallback((key, time, toType) => {
+    setDailyLogs(prevLogs => {
+      const log = prevLogs[key];
+      const target = normalizeMealType(toType);
+      if (!log?.meals?.some(m => m.time === time && normalizeMealType(m.mealType) !== target)) return prevLogs;
+      const meals = log.meals.map(m => (m.time === time ? { ...m, mealType: target } : m));
+      const nextLogs = { ...prevLogs, [key]: { ...log, meals } };
+      persist(profile, nextLogs);
+      syncDayUp(key, nextLogs[key]);
+      return nextLogs;
+    });
+  }, [persist, profile, syncDayUp]);
+
   // 取得某一天依餐次分組的食物紀錄，永遠回傳四個餐次的完整結構
   const getMealsByType = useCallback((key) => {
     const grouped = { breakfast: [], lunch: [], dinner: [], snacks: [] };
@@ -255,6 +269,7 @@ export function UserDataProvider({ children }) {
     updateProfile,
     addMeal,
     removeMeal,
+    moveMeal,
     getDayTotals,
     getDayLog,
     getMealsByType,

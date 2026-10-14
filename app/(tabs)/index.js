@@ -1,6 +1,6 @@
 import {
   View, Text, TouchableOpacity,
-  StyleSheet, ScrollView, SafeAreaView, Modal, Animated,
+  StyleSheet, ScrollView, SafeAreaView, Modal, Animated, PanResponder, Pressable,
 } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
@@ -136,15 +136,15 @@ function MacroProgress({ label, cur, target, color }) {
   );
 }
 
-function MealSection({ type, meals, goal, t, onAdd, onRemove }) {
-  const [open, setOpen] = useState(false);
+// 一個餐次卡片。食物紀錄長按後可以拖到另一個餐次（拖曳本身由 DiaryScreen 處理，這裡只回報起點和卡片位置）
+function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, cardRef, isDropTarget, draggingTime, onDragStart, onPressOut }) {
   const subtotal = Math.round(meals.reduce((sum, m) => sum + (m.energy || 0), 0));
   const target = goal != null ? Math.round(goal * MEAL_META[type].share) : null;
   const pct = target ? Math.min(subtotal / target, 1) * 100 : 0;
 
   return (
-    <View style={s.mealCard}>
-      <TouchableOpacity style={s.mealHeader} onPress={() => setOpen(o => !o)} activeOpacity={0.7}>
+    <View ref={cardRef} collapsable={false} style={[s.mealCard, isDropTarget && s.mealCardDrop]}>
+      <TouchableOpacity style={s.mealHeader} onPress={onToggle} activeOpacity={0.7}>
         <View style={{ flex: 1 }}>
           <Text style={s.mealName}>{t[type]}</Text>
           <Text style={s.mealKcal}>
@@ -163,13 +163,21 @@ function MealSection({ type, meals, goal, t, onAdd, onRemove }) {
 
       {open && (
         meals.length ? meals.map(m => (
-          <View key={m.time} style={s.mealItemRow}>
+          <Pressable
+            key={m.time}
+            style={[s.mealItemRow, draggingTime === m.time && { opacity: 0.3 }]}
+            delayLongPress={300}
+            onLongPress={e => onDragStart(m, type, e.nativeEvent)}
+            onPressOut={onPressOut}
+            accessibilityHint={t.dragToMoveHint}
+          >
+            <Ionicons name="reorder-two-outline" size={16} color={C.border} />
             <Text style={s.mealItemName} numberOfLines={1}>{m.name}</Text>
             <Text style={s.mealItemKcal}>{Math.round(m.energy || 0)} kcal</Text>
             <TouchableOpacity onPress={() => onRemove(m.time)} hitSlop={8}>
               <Ionicons name="trash-outline" size={16} color={C.macroFat} />
             </TouchableOpacity>
-          </View>
+          </Pressable>
         )) : (
           <Text style={s.noMeals}>{t.noMealsLogged}</Text>
         )
@@ -180,7 +188,7 @@ function MealSection({ type, meals, goal, t, onAdd, onRemove }) {
 
 export default function DiaryScreen() {
   const { lang, t } = useLanguage();
-  const { profile, dailyLogs, updateProfile, getDayTotals, getMealsByType, removeMeal } = useUserData();
+  const { profile, dailyLogs, updateProfile, getDayTotals, getMealsByType, removeMeal, moveMeal } = useUserData();
   const [selectedKey, setSelectedKey] = useState(dateKey());
   const [weekOffset, setWeekOffset] = useState(0);
   const [showGoalModal, setShowGoalModal] = useState(false);
@@ -189,6 +197,72 @@ export default function DiaryScreen() {
   const [showCalModal, setShowCalModal] = useState(false);
   const [calYM, setCalYM] = useState({ y: new Date().getFullYear(), m: new Date().getMonth() });
   const [addTarget, setAddTarget] = useState(null); // 正在為哪個餐次加食物（null = 關閉）
+  const [openTypes, setOpenTypes] = useState({}); // 哪些餐次卡片是展開的
+
+  // 長按食物紀錄後拖到另一個餐次：放開時手指落在哪張餐次卡片上，就移到那個餐次（只在同一天內移動）
+  const [drag, setDrag] = useState(null); // { meal, fromType, overType }
+  const dragRef = useRef(null);
+  const grabbedRef = useRef(false); // 拖曳手勢是否已經從 Pressable 接手
+  const cardRefs = useRef({});
+  const cardRects = useRef({});
+  const screenRef = useRef(null);
+  const screenTop = useRef(0);
+  const ghostY = useRef(new Animated.Value(0)).current;
+
+  const toggleOpen = (type) => setOpenTypes(o => ({ ...o, [type]: !o[type] }));
+
+  const typeAt = (pageY) =>
+    MEAL_TYPES.find(type => {
+      const r = cardRects.current[type];
+      return r && pageY >= r.y && pageY <= r.y + r.height;
+    }) ?? null;
+
+  const updateDrag = (next) => {
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  const startDrag = (meal, fromType, { pageY }) => {
+    grabbedRef.current = false;
+    screenRef.current?.measureInWindow((x, y) => { screenTop.current = y; ghostY.setValue(pageY - y - 22); });
+    for (const type of MEAL_TYPES) {
+      cardRefs.current[type]?.measureInWindow((x, y, width, height) => {
+        cardRects.current[type] = { y, height };
+      });
+    }
+    updateDrag({ meal, fromType, overType: fromType });
+  };
+
+  const endDrag = (drop) => {
+    const d = dragRef.current;
+    if (!d) return;
+    if (drop && d.overType && d.overType !== d.fromType) {
+      moveMeal(selectedKey, d.meal.time, d.overType);
+      setOpenTypes(o => ({ ...o, [d.overType]: true })); // 展開目的地，讓使用者看到它移過去了
+    }
+    updateDrag(null);
+  };
+  // PanResponder 只建立一次，透過 ref 拿到最新的 endDrag（裡面用到目前選的日期）
+  const endDragRef = useRef(endDrag);
+  endDragRef.current = endDrag;
+
+  const dragResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponderCapture: () => !!dragRef.current,
+    onPanResponderGrant: () => { grabbedRef.current = true; },
+    onPanResponderMove: (e, g) => {
+      ghostY.setValue(g.moveY - screenTop.current - 22);
+      const over = typeAt(g.moveY);
+      if (dragRef.current && over !== dragRef.current.overType) updateDrag({ ...dragRef.current, overType: over });
+    },
+    onPanResponderRelease: () => endDragRef.current(true),
+    onPanResponderTerminate: () => endDragRef.current(false),
+    onPanResponderTerminationRequest: () => false,
+  })).current;
+
+  // 長按後沒移動就放開：手勢沒交給拖曳處理，在這裡取消
+  const onRowPressOut = () => {
+    setTimeout(() => { if (!grabbedRef.current) endDragRef.current(false); }, 0);
+  };
 
   const week = getWeek(weekOffset);
   // 週曆標頭顯示該週的年月
@@ -298,7 +372,8 @@ export default function DiaryScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
+      <View ref={screenRef} style={{ flex: 1 }} collapsable={false} {...dragResponder.panHandlers}>
+      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} scrollEnabled={!drag}>
 
         {/* Header */}
         <View style={s.header}>
@@ -398,13 +473,30 @@ export default function DiaryScreen() {
             meals={mealsByType[type]}
             goal={goal}
             t={t}
+            open={!!openTypes[type]}
+            onToggle={() => toggleOpen(type)}
             onAdd={() => setAddTarget(type)}
             onRemove={(time) => removeMeal(selectedKey, time)}
+            cardRef={el => { cardRefs.current[type] = el; }}
+            isDropTarget={!!drag && drag.overType === type && type !== drag.fromType}
+            draggingTime={drag?.meal.time}
+            onDragStart={startDrag}
+            onPressOut={onRowPressOut}
           />
         ))}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* 拖曳中跟著手指移動的那筆食物 */}
+      {drag && (
+        <Animated.View pointerEvents="none" style={[s.dragGhost, { transform: [{ translateY: ghostY }] }]}>
+          <Ionicons name="reorder-two-outline" size={16} color={C.primaryDark} />
+          <Text style={s.mealItemName} numberOfLines={1}>{drag.meal.name}</Text>
+          <Text style={s.mealItemKcal}>{Math.round(drag.meal.energy || 0)} kcal</Text>
+        </Animated.View>
+      )}
+      </View>
 
       {/* 新增食物 Modal：拍照辨識 */}
       {addTarget != null && (
@@ -756,8 +848,18 @@ const s = StyleSheet.create({
   /* 餐次卡片 */
   mealCard: {
     backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 2, borderColor: 'transparent', // 拖曳時目的地卡片改成綠框，平常留透明框避免版面跳動
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  mealCardDrop: { borderColor: C.primary, backgroundColor: C.bg },
+  dragGhost: {
+    position: 'absolute', left: 20, right: 20, top: 0,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.primary,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15, shadowRadius: 12, elevation: 8,
   },
   mealHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   mealEmoji:  { fontSize: 26 },

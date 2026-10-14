@@ -7,6 +7,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
+import MealPicker from '../../components/MealPicker';
 
 // 包裝食品營養資料來自 Open Food Facts（公開、免費、不需要金鑰），App 直接查，不經過我們的後端
 const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product';
@@ -74,7 +75,9 @@ export default function BarcodeScan() {
   const router = useRouter();
   const { profile, addMeal, getDayTotals } = useUserData();
   const { mealType: mealTypeParam } = useLocalSearchParams();
-  const mealType = MEAL_TYPES.includes(mealTypeParam) ? mealTypeParam : defaultMealType();
+  // 使用者在結果卡上改過餐次就用改過的，否則用首頁帶進來的（或依時段判斷）
+  const [mealOverride, setMealOverride] = useState(null);
+  const mealType = mealOverride ?? (MEAL_TYPES.includes(mealTypeParam) ? mealTypeParam : defaultMealType());
 
   const [permission, requestPermission] = useCameraPermissions();
   const [manualCode, setManualCode] = useState('');
@@ -95,6 +98,7 @@ export default function BarcodeScan() {
       setErrorKey(null);
       setProduct(null);
       setLogged(false);
+      setMealOverride(null);
       busyRef.current = false;
     }, [])
   );
@@ -201,6 +205,7 @@ export default function BarcodeScan() {
               {t.camMacroLine.replace('{p}', totals.protein).replace('{c}', totals.carbs).replace('{f}', totals.fat)}
             </Text>
             <Text style={s.mealLine}>📒 {logged ? t.loggedToMeal : t.willLogToMeal}: {t[mealType]}</Text>
+            {!logged && <MealPicker value={mealType} onChange={setMealOverride} t={t} />}
             {remaining != null && (
               <Text style={s.remaining}>
                 {remaining >= 0 ? t.camRemaining.replace('{n}', remaining) : t.camOver.replace('{n}', Math.abs(remaining))}
