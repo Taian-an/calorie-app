@@ -2,6 +2,15 @@
 
 An AI calorie tracker: people log what they eat, AI estimates nutrition from a photo or a description, and an AI coach answers questions. This glossary is shared by the app and the back end.
 
+## Names
+
+**Calorie Tracks**:
+The product: the app, its web version and calorietracks.com. The only name used for the product inside the app and in writing about it.
+_Avoid_: AI Calorie Tracker, Calorie AI, AI 卡路里追蹤 (as product names)
+
+**HealthierDiet**:
+The senior project that produced Calorie Tracks. Names the project and its report, never the product.
+
 ## People
 
 **Account**:
@@ -10,6 +19,9 @@ _Avoid_: User (in conversation), login
 
 **Sign-in method**:
 A way to reach an Account: Google or email and password. An Account can have more than one.
+
+**Account deletion**:
+Removing an Account together with everything recorded under it (Profile, Entries, Days, AI Analyses and usage). It means the same whether the Account holder or an admin does it.
 
 **Profile**:
 The body details and Goal an Account holder provides (sex, age, height, weight, activity level, Goal), from which the Target is worked out. Not the Account as a whole.
