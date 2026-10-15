@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey } from '../../context/UserDataContext';
 import { recalcProfile, ageFromBirthday } from '../../constants/bodyCalc';
+import { BirthdaySheet, HeightSheet, WeightSheet, TimelineSheet } from '../../components/ProfileWheels';
 import translations, { LANG_KEYS } from '../../constants/translations';
 import { usePreferences, useStyles, NOTIFY_TYPES } from '../../context/PreferencesContext';
 import {
@@ -136,6 +137,9 @@ export default function ProfileScreen() {
   const [showGenderSheet, setShowGenderSheet] = useState(false);
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
   const [showGoalWeightModal, setShowGoalWeightModal] = useState(false);
+  const [showHeightSheet, setShowHeightSheet] = useState(false);
+  const [showWeightSheet, setShowWeightSheet] = useState(false);
+  const [showTimelineSheet, setShowTimelineSheet] = useState(false);
 
   // 只改單一欄位（性別、生日、目標體重）：整份重算 BMR / TDEE / Goal / 目標熱量，但不算一次量體重
   const patchProfile = (patch) => updateProfile(recalcProfile({ ...profile, ...patch }), { weighedIn: false });
@@ -341,13 +345,19 @@ export default function ProfileScreen() {
                 : `${t.notSet}・${profile.age} ${t.ageUnit}`}
               onPress={() => setShowBirthdayModal(true)}
             />
-            <SettingRow icon="resize-outline"  label={t.height} value={formatHeight(profile.height, units)} onPress={openEditModal} />
-            <SettingRow icon="scale-outline"   label={t.weight} value={formatWeight(profile.weight, units)} onPress={openEditModal} />
+            <SettingRow icon="resize-outline"  label={t.height} value={formatHeight(profile.height, units)} onPress={() => setShowHeightSheet(true)} />
+            <SettingRow icon="scale-outline"   label={t.weight} value={formatWeight(profile.weight, units)} onPress={() => setShowWeightSheet(true)} />
             <SettingRow
               icon="flag-outline"
               label={t.goalWeight}
               value={profile.targetWeight != null ? formatWeight(profile.targetWeight, units) : t.notSet}
               onPress={() => setShowGoalWeightModal(true)}
+            />
+            <SettingRow
+              icon="hourglass-outline"
+              label={t.goalTimeline}
+              value={profile.goalMonths ? `${profile.goalMonths} ${t.obMonthsUnit}` : t.notSet}
+              onPress={() => setShowTimelineSheet(true)}
             />
             <SettingRow icon="walk-outline"    label={t.activityLevel} value={t.activities?.find(a => a.key === profile.activity)?.label} onPress={openEditModal} />
             <SettingRow icon="calculator-outline" label="BMI" value={`${bmi.toFixed(1)}・${bmiData.label}`} valueColor={bmiData.color} isLast />
@@ -461,9 +471,10 @@ export default function ProfileScreen() {
       />
 
       {showBirthdayModal && (
-        <BirthdayModal
+        <BirthdaySheet
           t={t} lang={lang}
           initial={profile.birthday}
+          fallbackAge={profile.age}
           onClose={() => setShowBirthdayModal(false)}
           onSave={birthday => {
             patchProfile({ birthday, age: ageFromBirthday(birthday, dateKey()), ageSetAt: dateKey() });
@@ -473,11 +484,39 @@ export default function ProfileScreen() {
       )}
 
       {showGoalWeightModal && (
-        <GoalWeightModal
-          t={t} units={units}
+        <WeightSheet
+          title={t.goalWeight} t={t} units={units}
           initialKg={profile.targetWeight ?? profile.weight}
           onClose={() => setShowGoalWeightModal(false)}
           onSave={kg => { patchProfile({ targetWeight: kg }); setShowGoalWeightModal(false); }}
+        />
+      )}
+
+      {showHeightSheet && (
+        <HeightSheet
+          t={t} units={units}
+          initialCm={profile.height}
+          onClose={() => setShowHeightSheet(false)}
+          onSave={cm => { patchProfile({ height: cm }); setShowHeightSheet(false); }}
+        />
+      )}
+
+      {/* 體重：從這裡存就算今天量了一次體重（Weight trend、動態調整都從這裡取資料） */}
+      {showWeightSheet && (
+        <WeightSheet
+          title={t.weight} t={t} units={units}
+          initialKg={profile.weight}
+          onClose={() => setShowWeightSheet(false)}
+          onSave={kg => { updateProfile(recalcProfile({ ...profile, weight: kg })); setShowWeightSheet(false); }}
+        />
+      )}
+
+      {showTimelineSheet && (
+        <TimelineSheet
+          t={t}
+          initialMonths={profile.goalMonths}
+          onClose={() => setShowTimelineSheet(false)}
+          onSave={months => { patchProfile({ goalMonths: months }); setShowTimelineSheet(false); }}
         />
       )}
 
@@ -628,104 +667,6 @@ function GenderSheet({ visible, onClose, t, selected, onSelect }) {
               </TouchableOpacity>
             );
           })}
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
-
-// ── 生日：選月份、輸入日和年。存成 YYYY-MM-DD，年齡由生日算 ─────────────────
-function BirthdayModal({ t, lang, initial, onClose, onSave }) {
-  const s = useStyles(makeStyles);
-  const [y0, m0, d0] = (initial ?? '').split('-').map(Number);
-  const [month, setMonth] = useState(m0 || null);
-  const [day, setDay] = useState(d0 ? String(d0) : '');
-  const [year, setYear] = useState(y0 ? String(y0) : '');
-  const [error, setError] = useState(false);
-  const locale = lang === 'zh' ? 'zh-TW' : 'en-US';
-  const monthNames = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(locale, { month: 'short' }));
-
-  const save = () => {
-    const y = parseInt(year, 10), d = parseInt(day, 10);
-    const date = new Date(y, (month ?? 0) - 1, d);
-    const valid = month && date.getFullYear() === y && date.getMonth() === month - 1 && date.getDate() === d;
-    const pad = n => String(n).padStart(2, '0');
-    const key = valid ? `${y}-${pad(month)}-${pad(d)}` : null;
-    const age = key ? ageFromBirthday(key, dateKey()) : -1;
-    if (!key || age < 13 || age > 100) { setError(true); return; }
-    onSave(key);
-  };
-
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.langModalCard}>
-          <Text style={s.modalTitle}>{t.birthday}</Text>
-          <Text style={s.sectionLabel}>{t.birthdayMonth}</Text>
-          <View style={s.monthGrid}>
-            {monthNames.map((name, i) => (
-              <TouchableOpacity
-                key={name}
-                style={[s.monthChip, month === i + 1 && s.monthChipActive]}
-                onPress={() => { setMonth(i + 1); setError(false); }}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.monthChipText, month === i + 1 && s.monthChipTextActive]}>{name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={s.statRow}>
-            <View style={s.statBox}>
-              <Text style={s.statLabel}>{t.birthdayDay}</Text>
-              <TextInput style={s.statInput} value={day} onChangeText={v => { setDay(v.replace(/\D/g, '')); setError(false); }} keyboardType="number-pad" maxLength={2} placeholder="2" />
-            </View>
-            <View style={s.statBox}>
-              <Text style={s.statLabel}>{t.birthdayYear}</Text>
-              <TextInput style={s.statInput} value={year} onChangeText={v => { setYear(v.replace(/\D/g, '')); setError(false); }} keyboardType="number-pad" maxLength={4} placeholder="2005" />
-            </View>
-          </View>
-          {error && <Text style={[s.feedbackMsg, s.feedbackMsgError]}>{t.birthdayInvalid}</Text>}
-          <TouchableOpacity style={[s.editBtnSolid, s.modalSaveBtn]} onPress={save} activeOpacity={0.85}>
-            <Text style={s.editBtnSolidText}>{t.saveLabel}</Text>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
-
-// ── 目標體重：用目前的單位輸入，存成 kg；Goal（增肌/減脂/維持）跟著重判 ───────────
-function GoalWeightModal({ t, units, initialKg, onClose, onSave }) {
-  const { C } = usePreferences();
-  const s = useStyles(makeStyles);
-  const [value, setValue] = useState(initialKg != null ? String(weightToDisplay(initialKg, units)) : '');
-  const [error, setError] = useState(false);
-  const save = () => {
-    const kg = weightFromDisplay(parseFloat(value), units);
-    if (!(kg >= 30 && kg <= 250)) { setError(true); return; }
-    onSave(roundKg(kg));
-  };
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.langModalCard}>
-          <Text style={s.modalTitle}>{t.goalWeight}</Text>
-          <View style={s.goalWeightRow}>
-            <TextInput
-              style={[s.statInput, { flex: 1 }]}
-              value={value}
-              onChangeText={v => { setValue(v.replace(/[^0-9.]/g, '')); setError(false); }}
-              keyboardType="decimal-pad"
-              autoFocus
-              selectTextOnFocus
-              placeholderTextColor={C.textSecondary}
-            />
-            <Text style={s.goalWeightUnit}>{weightUnitLabel(units)}</Text>
-          </View>
-          {error && <Text style={[s.feedbackMsg, s.feedbackMsgError]}>{t.goalWeightInvalid}</Text>}
-          <TouchableOpacity style={[s.editBtnSolid, s.modalSaveBtn]} onPress={save} activeOpacity={0.85}>
-            <Text style={s.editBtnSolidText}>{t.saveLabel}</Text>
-          </TouchableOpacity>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -1088,19 +1029,6 @@ const makeStyles = (C) => StyleSheet.create({
   },
   sheetOptionActive: { borderColor: C.primary, backgroundColor: C.tint },
   sheetOptionText: { flex: 1, fontSize: 17, fontWeight: '700', color: C.textPrimary },
-
-  /* 生日 / 目標體重 */
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  monthChip: {
-    width: '22%', paddingVertical: 9, borderRadius: 10, alignItems: 'center',
-    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.subtle,
-  },
-  monthChipActive: { borderColor: C.primary, backgroundColor: C.primary },
-  monthChipText: { fontSize: 13, fontWeight: '700', color: C.textPrimary },
-  monthChipTextActive: { color: C.onPrimary },
-  modalSaveBtn: { alignSelf: 'stretch', alignItems: 'center', marginTop: 16 },
-  goalWeightRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  goalWeightUnit: { fontSize: 16, fontWeight: '700', color: C.textSecondary },
 
   /* Notifications Modal */
   notifyRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 },

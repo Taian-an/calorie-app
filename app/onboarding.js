@@ -75,6 +75,10 @@ export default function OnboardingScreen() {
     setResult(recalcProfile({
       age, ageSetAt: dateKey(), gender, height: roundCm(height), weight: roundKg(weight),
       targetWeight: roundKg(targetWeight), activity,
+      // 目標時程存成月數（個人頁的 Goal timeline 用）
+      goalMonths: durationKey === 'other'
+        ? Math.max(1, Math.round(parseFloat(customMonths) || 1))
+        : { 4: 1, 12: 3, 24: 6, 52: 12 }[durationKey],
     }));
     setPhase('building');
   };
