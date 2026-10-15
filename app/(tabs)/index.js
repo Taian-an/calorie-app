@@ -526,6 +526,19 @@ export default function DiaryScreen() {
           />
         ))}
 
+        {/* 不先選餐次的快速新增：跟餐次的 + 一樣打開新增食物選單，AI 分析完再選要記到早餐、午餐、晚餐或點心 */}
+        <View style={s.quickAddRow}>
+          <TouchableOpacity
+            style={s.quickAddBtn}
+            onPress={() => setAddTarget('')}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t.addFoodTitle}
+          >
+            <Ionicons name="camera-outline" size={24} color={C.primaryDark} />
+          </TouchableOpacity>
+        </View>
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -935,6 +948,11 @@ const makeStyles = (C) => StyleSheet.create({
   addModalCard: {
     width: '100%', maxHeight: '80%', backgroundColor: C.card,
     borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20,
+  },
+  quickAddRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
+  quickAddBtn: {
+    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.card, borderWidth: 1.5, borderColor: C.primary,
   },
   scanBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
