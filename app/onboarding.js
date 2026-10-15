@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData, dateKey } from '../context/UserDataContext';
-import { calcBmr, activityFactor, GOAL_DELTAS } from '../constants/bodyCalc';
+import { recalcProfile } from '../constants/bodyCalc';
 import { usePreferences, useStyles } from '../context/PreferencesContext';
 import {
   weightToDisplay, weightFromDisplay, weightUnitLabel, formatWeight,
@@ -71,11 +71,11 @@ export default function OnboardingScreen() {
 
   // 按最後一步的「完成」：先算好結果，進入建立動畫，動畫跑完才真的存檔放行
   const startBuilding = () => {
-    const w = roundKg(weight), h = roundCm(height), a = age;
-    const bmr = calcBmr(gender, w, h, a);
-    const tdee = bmr * activityFactor(activity);
-    const goal = targetWeight > weight + 0.3 ? 'bulk' : targetWeight < weight - 0.3 ? 'cut' : 'maintain';
-    setResult({ age: a, ageSetAt: dateKey(), gender, height: h, weight: w, activity, bmr, tdee, goal, target: tdee + GOAL_DELTAS[goal] });
+    // 目標體重也存起來（個人頁顯示、之後判斷 Goal 用）；Goal 和目標熱量由 recalcProfile 依目標體重算
+    setResult(recalcProfile({
+      age, ageSetAt: dateKey(), gender, height: roundCm(height), weight: roundKg(weight),
+      targetWeight: roundKg(targetWeight), activity,
+    }));
     setPhase('building');
   };
 

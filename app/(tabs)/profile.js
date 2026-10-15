@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey } from '../../context/UserDataContext';
-import { calcBmr, activityFactor, GOAL_DELTAS } from '../../constants/bodyCalc';
+import { recalcProfile, ageFromBirthday } from '../../constants/bodyCalc';
 import translations, { LANG_KEYS } from '../../constants/translations';
 import { usePreferences, useStyles, NOTIFY_TYPES } from '../../context/PreferencesContext';
 import {
@@ -70,7 +70,7 @@ function StatCard({ value, unit, label, color, bg, onInfoPress }) {
 }
 
 // 一列設定/資料：左邊 icon+標題，右邊值＋箭頭（onPress 為空時純顯示）
-function SettingRow({ icon, label, value, valueColor, onPress, isLast }) {
+function SettingRow({ icon, label, value, valueColor, onPress, isLast, chevron = 'chevron-forward' }) {
   const { C } = usePreferences();
   const s = useStyles(makeStyles);
   const inner = (
@@ -87,7 +87,7 @@ function SettingRow({ icon, label, value, valueColor, onPress, isLast }) {
             {value}
           </Text>
         )}
-        {onPress && <Ionicons name="chevron-forward" size={16} color={C.textSecondary} />}
+        {onPress && <Ionicons name={chevron} size={16} color={C.textSecondary} />}
       </View>
     </View>
   );
@@ -133,6 +133,12 @@ export default function ProfileScreen() {
   const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const [showUnitsModal, setShowUnitsModal] = useState(false);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [showGenderSheet, setShowGenderSheet] = useState(false);
+  const [showBirthdayModal, setShowBirthdayModal] = useState(false);
+  const [showGoalWeightModal, setShowGoalWeightModal] = useState(false);
+
+  // 只改單一欄位（性別、生日、目標體重）：整份重算 BMR / TDEE / Goal / 目標熱量，但不算一次量體重
+  const patchProfile = (patch) => updateProfile(recalcProfile({ ...profile, ...patch }), { weighedIn: false });
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [infoModal, setInfoModal] = useState(null); // 'bmi' | 'tdee' | 'bmr' | null —— 統計方框的公式說明
   const [feedbackText, setFeedbackText] = useState('');
@@ -202,19 +208,17 @@ export default function ProfileScreen() {
     const w = profile && weight === String(weightToDisplay(profile.weight, units))
       ? profile.weight
       : roundKg(weightFromDisplay(parseFloat(weight), units));
-    const a = parseFloat(age);
+    // 有生日的話年齡由生日決定，這裡不能改
+    const a = profile?.birthday ? profile.age : parseFloat(age);
     if (!(h > 0) || !(w > 0) || !(a > 0)) return;
-    const bmr = calcBmr(gender, w, h, a);
-    const tdee = bmr * activityFactor(activity);
-    // 保留首頁選的目標模式（增肌/減脂/維持），依新 TDEE 重算目標熱量
-    const goal = profile?.goal ?? 'maintain';
     // 年齡有改才重設起算日；沒改就沿用，不然每次編輯都會把「滿一年 +1 歲」的計時歸零
     const ageSetAt = a === profile?.age && profile?.ageSetAt ? profile.ageSetAt : dateKey();
-    updateProfile({
+    // 保留 profile 其他欄位（生日、目標體重、動態調整…），Goal 和目標熱量由 recalcProfile 重算
+    updateProfile(recalcProfile({
+      ...(profile ?? {}),
       name: name.trim(), avatarKey,
-      age: a, ageSetAt, gender, height: h, weight: w, activity, bmr, tdee,
-      goal, target: tdee + (GOAL_DELTAS[goal] ?? 0),
-    });
+      age: a, ageSetAt, gender, height: h, weight: w, activity,
+    }), { weighedIn: !profile || w !== profile.weight });
     setShowEditModal(false);
   };
 
@@ -284,6 +288,7 @@ export default function ProfileScreen() {
           height={height} setHeight={setHeight} weight={weight} setWeight={setWeight}
           activity={activity} setActivity={setActivity}
           units={units}
+          hasBirthday={!!profile?.birthday}
         />
       </SafeAreaView>
     );
@@ -327,10 +332,23 @@ export default function ProfileScreen() {
           <View style={s.card}>
             <Text style={s.cardTitle}>📋 {t.personalInfo}</Text>
             <View style={s.divider} />
-            <SettingRow icon="person-outline"  label={t.gender} value={genderLabel} onPress={openEditModal} />
-            <SettingRow icon="calendar-outline" label={t.age}    value={`${profile.age} ${t.ageUnit}`} onPress={openEditModal} />
+            <SettingRow icon="person-outline"  label={t.gender} value={genderLabel} onPress={() => setShowGenderSheet(true)} chevron="chevron-expand" />
+            <SettingRow
+              icon="gift-outline"
+              label={t.birthday}
+              value={profile.birthday
+                ? `${formatBirthday(profile.birthday, lang)}${t.birthdayAge.replace('{n}', profile.age)}`
+                : `${t.notSet}・${profile.age} ${t.ageUnit}`}
+              onPress={() => setShowBirthdayModal(true)}
+            />
             <SettingRow icon="resize-outline"  label={t.height} value={formatHeight(profile.height, units)} onPress={openEditModal} />
             <SettingRow icon="scale-outline"   label={t.weight} value={formatWeight(profile.weight, units)} onPress={openEditModal} />
+            <SettingRow
+              icon="flag-outline"
+              label={t.goalWeight}
+              value={profile.targetWeight != null ? formatWeight(profile.targetWeight, units) : t.notSet}
+              onPress={() => setShowGoalWeightModal(true)}
+            />
             <SettingRow icon="walk-outline"    label={t.activityLevel} value={t.activities?.find(a => a.key === profile.activity)?.label} onPress={openEditModal} />
             <SettingRow icon="calculator-outline" label="BMI" value={`${bmi.toFixed(1)}・${bmiData.label}`} valueColor={bmiData.color} isLast />
           </View>
@@ -367,6 +385,7 @@ export default function ProfileScreen() {
         height={height} setHeight={setHeight} weight={weight} setWeight={setWeight}
         activity={activity} setActivity={setActivity}
         units={units}
+        hasBirthday={!!profile?.birthday}
       />
 
       {/* Language Modal */}
@@ -432,6 +451,35 @@ export default function ProfileScreen() {
       />
 
       <NotificationsModal visible={showNotifyModal} onClose={() => setShowNotifyModal(false)} t={t} />
+
+      <GenderSheet
+        visible={showGenderSheet}
+        onClose={() => setShowGenderSheet(false)}
+        t={t}
+        selected={profile.gender}
+        onSelect={g => { if (g !== profile.gender) patchProfile({ gender: g }); setShowGenderSheet(false); }}
+      />
+
+      {showBirthdayModal && (
+        <BirthdayModal
+          t={t} lang={lang}
+          initial={profile.birthday}
+          onClose={() => setShowBirthdayModal(false)}
+          onSave={birthday => {
+            patchProfile({ birthday, age: ageFromBirthday(birthday, dateKey()), ageSetAt: dateKey() });
+            setShowBirthdayModal(false);
+          }}
+        />
+      )}
+
+      {showGoalWeightModal && (
+        <GoalWeightModal
+          t={t} units={units}
+          initialKg={profile.targetWeight ?? profile.weight}
+          onClose={() => setShowGoalWeightModal(false)}
+          onSave={kg => { patchProfile({ targetWeight: kg }); setShowGoalWeightModal(false); }}
+        />
+      )}
 
       {/* Feedback Modal */}
       <Modal
@@ -544,6 +592,146 @@ export default function ProfileScreen() {
   );
 }
 
+// 生日顯示成 Feb 2, 2005 / 2005年2月2日
+function formatBirthday(key, lang) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(lang === 'zh' ? 'zh-TW' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── 性別：從底部滑出的選單，每個選項有自己的圖示 ─────────────────────────
+const GENDER_OPTIONS = [
+  { key: 'male', icon: 'male', labelKey: 'obMale' },
+  { key: 'female', icon: 'female', labelKey: 'obFemale' },
+  { key: 'other', icon: 'male-female', labelKey: 'obOther' },
+];
+function GenderSheet({ visible, onClose, t, selected, onSelect }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlayBottom} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.sheetCard}>
+          <View style={s.sheetHandle} />
+          <Text style={s.sheetTitle}>{t.gender}</Text>
+          {GENDER_OPTIONS.map(g => {
+            const active = selected === g.key;
+            return (
+              <TouchableOpacity
+                key={g.key}
+                style={[s.sheetOption, active && s.sheetOptionActive]}
+                onPress={() => onSelect(g.key)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={g.icon} size={22} color={C.primaryDark} />
+                <Text style={s.sheetOptionText}>{t[g.labelKey]}</Text>
+                {active && <Ionicons name="checkmark" size={22} color={C.primaryDark} />}
+              </TouchableOpacity>
+            );
+          })}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// ── 生日：選月份、輸入日和年。存成 YYYY-MM-DD，年齡由生日算 ─────────────────
+function BirthdayModal({ t, lang, initial, onClose, onSave }) {
+  const s = useStyles(makeStyles);
+  const [y0, m0, d0] = (initial ?? '').split('-').map(Number);
+  const [month, setMonth] = useState(m0 || null);
+  const [day, setDay] = useState(d0 ? String(d0) : '');
+  const [year, setYear] = useState(y0 ? String(y0) : '');
+  const [error, setError] = useState(false);
+  const locale = lang === 'zh' ? 'zh-TW' : 'en-US';
+  const monthNames = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(locale, { month: 'short' }));
+
+  const save = () => {
+    const y = parseInt(year, 10), d = parseInt(day, 10);
+    const date = new Date(y, (month ?? 0) - 1, d);
+    const valid = month && date.getFullYear() === y && date.getMonth() === month - 1 && date.getDate() === d;
+    const pad = n => String(n).padStart(2, '0');
+    const key = valid ? `${y}-${pad(month)}-${pad(d)}` : null;
+    const age = key ? ageFromBirthday(key, dateKey()) : -1;
+    if (!key || age < 13 || age > 100) { setError(true); return; }
+    onSave(key);
+  };
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.langModalCard}>
+          <Text style={s.modalTitle}>{t.birthday}</Text>
+          <Text style={s.sectionLabel}>{t.birthdayMonth}</Text>
+          <View style={s.monthGrid}>
+            {monthNames.map((name, i) => (
+              <TouchableOpacity
+                key={name}
+                style={[s.monthChip, month === i + 1 && s.monthChipActive]}
+                onPress={() => { setMonth(i + 1); setError(false); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.monthChipText, month === i + 1 && s.monthChipTextActive]}>{name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={s.statRow}>
+            <View style={s.statBox}>
+              <Text style={s.statLabel}>{t.birthdayDay}</Text>
+              <TextInput style={s.statInput} value={day} onChangeText={v => { setDay(v.replace(/\D/g, '')); setError(false); }} keyboardType="number-pad" maxLength={2} placeholder="2" />
+            </View>
+            <View style={s.statBox}>
+              <Text style={s.statLabel}>{t.birthdayYear}</Text>
+              <TextInput style={s.statInput} value={year} onChangeText={v => { setYear(v.replace(/\D/g, '')); setError(false); }} keyboardType="number-pad" maxLength={4} placeholder="2005" />
+            </View>
+          </View>
+          {error && <Text style={[s.feedbackMsg, s.feedbackMsgError]}>{t.birthdayInvalid}</Text>}
+          <TouchableOpacity style={[s.editBtnSolid, s.modalSaveBtn]} onPress={save} activeOpacity={0.85}>
+            <Text style={s.editBtnSolidText}>{t.saveLabel}</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// ── 目標體重：用目前的單位輸入，存成 kg；Goal（增肌/減脂/維持）跟著重判 ───────────
+function GoalWeightModal({ t, units, initialKg, onClose, onSave }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
+  const [value, setValue] = useState(initialKg != null ? String(weightToDisplay(initialKg, units)) : '');
+  const [error, setError] = useState(false);
+  const save = () => {
+    const kg = weightFromDisplay(parseFloat(value), units);
+    if (!(kg >= 30 && kg <= 250)) { setError(true); return; }
+    onSave(roundKg(kg));
+  };
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.langModalCard}>
+          <Text style={s.modalTitle}>{t.goalWeight}</Text>
+          <View style={s.goalWeightRow}>
+            <TextInput
+              style={[s.statInput, { flex: 1 }]}
+              value={value}
+              onChangeText={v => { setValue(v.replace(/[^0-9.]/g, '')); setError(false); }}
+              keyboardType="decimal-pad"
+              autoFocus
+              selectTextOnFocus
+              placeholderTextColor={C.textSecondary}
+            />
+            <Text style={s.goalWeightUnit}>{weightUnitLabel(units)}</Text>
+          </View>
+          {error && <Text style={[s.feedbackMsg, s.feedbackMsgError]}>{t.goalWeightInvalid}</Text>}
+          <TouchableOpacity style={[s.editBtnSolid, s.modalSaveBtn]} onPress={save} activeOpacity={0.85}>
+            <Text style={s.editBtnSolidText}>{t.saveLabel}</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 // ── 單選清單 Modal（外觀、單位共用，樣式跟語言選單一樣）────────────────
 function OptionModal({ visible, onClose, title, options, selected, onSelect }) {
   const s = useStyles(makeStyles);
@@ -627,7 +815,7 @@ function EditProfileModal({
   name, setName, avatarKey, setAvatarKey,
   age, setAge, gender, setGender,
   height, setHeight, weight, setWeight,
-  activity, setActivity, units,
+  activity, setActivity, units, hasBirthday,
 }) {
   const { C } = usePreferences();
   const s = useStyles(makeStyles);
@@ -690,16 +878,16 @@ function EditProfileModal({
             </View>
             {gender === 'other' && <Text style={s.genderNote}>{t.genderOtherNote}</Text>}
 
-            {/* 年齡 */}
-            <Text style={[s.sectionLabel, { marginTop: 16 }]}>{t.age}</Text>
-            <TextInput
+            {/* 年齡（有生日的話由生日決定，不在這裡改） */}
+            {!hasBirthday && <Text style={[s.sectionLabel, { marginTop: 16 }]}>{t.age}</Text>}
+            {!hasBirthday && <TextInput
               style={s.nameInput}
               value={age}
               onChangeText={setAge}
               keyboardType="numeric"
               placeholder={t.ageUnit}
               placeholderTextColor={C.textSecondary}
-            />
+            />}
 
             {/* 身高、體重 */}
             <Text style={[s.sectionLabel, { marginTop: 16 }]}>{t.basicInfo}</Text>
@@ -885,6 +1073,34 @@ const makeStyles = (C) => StyleSheet.create({
   },
   feedbackMsg:      { fontSize: 12, color: C.primaryDark, marginTop: 10, textAlign: 'center', fontWeight: '600' },
   feedbackMsgError: { color: C.danger },
+
+  /* 性別底部選單 */
+  sheetCard: {
+    backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 34,
+  },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: C.borderStrong, marginBottom: 18 },
+  sheetTitle: { fontSize: 18, fontWeight: '800', color: C.textPrimary, marginBottom: 14 },
+  sheetOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    paddingVertical: 18, paddingHorizontal: 20, borderRadius: 18, marginBottom: 12,
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.subtle,
+  },
+  sheetOptionActive: { borderColor: C.primary, backgroundColor: C.tint },
+  sheetOptionText: { flex: 1, fontSize: 17, fontWeight: '700', color: C.textPrimary },
+
+  /* 生日 / 目標體重 */
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  monthChip: {
+    width: '22%', paddingVertical: 9, borderRadius: 10, alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.subtle,
+  },
+  monthChipActive: { borderColor: C.primary, backgroundColor: C.primary },
+  monthChipText: { fontSize: 13, fontWeight: '700', color: C.textPrimary },
+  monthChipTextActive: { color: C.onPrimary },
+  modalSaveBtn: { alignSelf: 'stretch', alignItems: 'center', marginTop: 16 },
+  goalWeightRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  goalWeightUnit: { fontSize: 16, fontWeight: '700', color: C.textSecondary },
 
   /* Notifications Modal */
   notifyRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 },

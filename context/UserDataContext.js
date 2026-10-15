@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { agedProfile } from '../constants/bodyCalc';
+import { agedProfile, adaptedProfile } from '../constants/bodyCalc';
 
 const STORAGE_KEY = '@calorie_app_user_data';
 const AUTH_KEY    = '@calorie_app_auth';
@@ -252,15 +252,18 @@ export function UserDataProvider({ children }) {
     await logout();
   }, [logout]);
 
-  // 更新使用者身體數據 / TDEE 目標，並把當天的體重、目標熱量記錄下來
-  const updateProfile = useCallback((newProfile) => {
+  // 更新使用者身體數據 / TDEE 目標，並把當天的目標熱量記錄下來。
+  // weighedIn：這次是不是真的量了體重——是的話今天記成一次量測（Weight trend 和預估體重從這裡起算）；
+  // 只改性別、生日、目標體重這類資料時傳 false，免得多出一筆假的量測
+  const updateProfile = useCallback((newProfile, { weighedIn = true } = {}) => {
     setDailyLogs(prevLogs => {
       const today = dateKey();
+      const prevDay = prevLogs[today] ?? { meals: [] };
       const nextLogs = {
         ...prevLogs,
         [today]: {
-          ...(prevLogs[today] ?? { meals: [] }),
-          weight: newProfile.weight,
+          ...prevDay,
+          weight: weighedIn ? newProfile.weight : prevDay.weight,
           tdee: newProfile.tdee,
           target: newProfile.target, // 每天保留當天適用的目標熱量（GLOSSARY「Target」），之後改目標不會改寫過去
         },
@@ -273,11 +276,15 @@ export function UserDataProvider({ children }) {
     syncProfileUp(newProfile);
   }, [persist, syncDayUp, syncProfileUp]);
 
-  // 年齡每滿一年自動 +1，並重算 BMR / TDEE / 目標熱量（見 constants/bodyCalc.js 的 agedProfile）。
+  // 自動更新 profile（見 constants/bodyCalc.js）：
+  // 1) 年齡：有生日依生日算，沒有就每滿一年 +1，並重算 BMR / TDEE / 目標熱量（agedProfile）
+  // 2) Adaptive adjustment：累積 2–4 週記錄和體重後，依 7 日平均體重趨勢小幅調整目標熱量（adaptedProfile）
   // 只改 profile，不走 updateProfile：那個會把今天記成「量過體重」，預估體重就會被歸零重算
   useEffect(() => {
     if (!loaded || !authEmail || !profile) return;
-    const next = agedProfile(profile, dateKey());
+    const today = dateKey();
+    const aged = agedProfile(profile, today);
+    const next = adaptedProfile(aged ?? profile, dailyLogs, today) ?? aged;
     if (!next) return;
     setProfile(next);
     persist(next, dailyLogs);

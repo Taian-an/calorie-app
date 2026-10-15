@@ -165,7 +165,7 @@ const makeStyles = (C) => StyleSheet.create({
   body: { paddingHorizontal: 18, paddingBottom: 40 },
   notFound: { fontSize: 15, color: C.textSecondary, textAlign: 'center', marginTop: 60, paddingHorizontal: 32 },
 
-  photo: { width: '100%', aspectRatio: 4 / 3, borderRadius: 20, backgroundColor: C.muted, marginBottom: 16 },
+  photo: { width: '55%', maxWidth: 240, aspectRatio: 1, alignSelf: 'center', borderRadius: 20, backgroundColor: C.muted, marginBottom: 16 },
   photoEmpty: { alignItems: 'center', justifyContent: 'center' },
 
   card: {

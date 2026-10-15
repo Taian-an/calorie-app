@@ -7,6 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, MICRO_KEYS } from '../../context/UserDataContext';
 import { usePreferences, useStyles } from '../../context/PreferencesContext';
 import { MICRO_UNITS } from '../../constants/nutrition';
+import { weightTrend, daysBetween } from '../../constants/bodyCalc';
 import { formatWeight, formatWeightDelta, weightToDisplay, weightUnitLabel } from '../../constants/units';
 
 
@@ -113,10 +114,13 @@ export default function ProgressScreen() {
     ? Math.round(trackedKeys.filter(k => getDayTotals(k).energy <= goal).length / daysTracked * 100)
     : null;
 
-  // 體重變化：第一筆有記體重的日誌 → 目前 profile 體重
+  // 體重變化看 Weight trend（7 日平均），不看單日數字：
+  // 起點 = 第一次量體重起 7 天內的平均，終點 = 最近一次量測當天的 7 日平均
   const weightKeys = Object.keys(dailyLogs).filter(k => dailyLogs[k]?.weight != null).sort();
-  const startWeight = weightKeys.length ? dailyLogs[weightKeys[0]].weight : null;
-  const currentWeight = profile?.weight ?? (weightKeys.length ? dailyLogs[weightKeys[weightKeys.length - 1]].weight : null);
+  const trend = weightTrend(dailyLogs);
+  const startPts = trend.filter(p => daysBetween(trend[0].date, p.date) < 7);
+  const startWeight = trend.length >= 2 ? startPts.reduce((sum, p) => sum + p.weight, 0) / startPts.length : null;
+  const currentWeight = trend.length >= 2 ? trend[trend.length - 1].avg : null;
   const weightDelta = startWeight != null && currentWeight != null
     ? Math.round((currentWeight - startWeight) * 10) / 10
     : null;
@@ -270,7 +274,7 @@ export default function ProgressScreen() {
               {/* 體重變化 */}
               {weightDelta != null && (
                 <View style={s.weightRow}>
-                  <Text style={s.avgLabel}>⚖️ {t.weightChange}</Text>
+                  <Text style={s.avgLabel}>⚖️ {t.weightChange}・{t.weightTrend7d}</Text>
                   <Text style={s.weightText}>
                     {formatWeight(startWeight, units)} → {formatWeight(currentWeight, units)}
                     <Text style={[s.weightDelta, { color: deltaGood ? C.primaryDark : C.surplus }]}>
