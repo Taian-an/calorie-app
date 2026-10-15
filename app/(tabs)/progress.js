@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, MICRO_KEYS } from '../../context/UserDataContext';
 import { usePreferences, useStyles } from '../../context/PreferencesContext';
+import { MICRO_UNITS } from '../../constants/nutrition';
 import { formatWeight, formatWeightDelta, weightToDisplay, weightUnitLabel } from '../../constants/units';
 
 
@@ -23,10 +24,6 @@ const RANGES = [
 ];
 
 // 微量營養素顯示用的單位（跟 server 端 AI 估算 prompt 的單位一致）
-const MICRO_UNITS = {
-  fiber: 'g', sugar: 'g', sodium: 'mg', potassium: 'mg',
-  calcium: 'mg', iron: 'mg', vitaminC: 'mg', vitaminA: 'mcg',
-};
 
 function DayBar({ label, totals, scaleMax, isToday }) {
   const { C } = usePreferences();

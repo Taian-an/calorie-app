@@ -127,7 +127,7 @@ function MacroProgress({ label, cur, target, color }) {
 }
 
 // 一個餐次卡片。食物紀錄長按後可以拖到另一個餐次（拖曳本身由 DiaryScreen 處理，這裡只回報起點和卡片位置）
-function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, cardRef, isDropTarget, draggingTime, onDragStart, onPressOut }) {
+function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, onOpenEntry, cardRef, isDropTarget, draggingTime, onDragStart, onPressOut }) {
   const { C } = useTheme();
   const s = useStyles(makeStyles);
   const subtotal = Math.round(meals.reduce((sum, m) => sum + (m.energy || 0), 0));
@@ -159,6 +159,7 @@ function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, ca
             key={m.time}
             style={[s.mealItemRow, draggingTime === m.time && { opacity: 0.3 }]}
             delayLongPress={300}
+            onPress={() => onOpenEntry(m)}
             onLongPress={e => onDragStart(m, type, e.nativeEvent)}
             onPressOut={onPressOut}
             accessibilityHint={t.dragToMoveHint}
@@ -526,6 +527,7 @@ export default function DiaryScreen() {
             onToggle={() => toggleOpen(type)}
             onAdd={() => openAddFood(type)}
             onRemove={(time) => removeMeal(selectedKey, time)}
+            onOpenEntry={(m) => router.push({ pathname: '/entry', params: { date: selectedKey, time: String(m.time) } })}
             cardRef={el => { cardRefs.current[type] = el; }}
             isDropTarget={!!drag && drag.overType === type && type !== drag.fromType}
             draggingTime={drag?.meal.time}

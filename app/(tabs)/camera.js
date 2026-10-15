@@ -344,6 +344,7 @@ export default function DietCamera() {
       iron:      result.iron,
       vitaminC:  result.vitaminC,
       vitaminA:  result.vitaminA,
+      photoId:   result.photoId, // 後端存的照片縮圖，詳細頁顯示用（文字輸入沒有照片）
       mealType,
     }, capturedAtRef.current);
     setLogged(true);

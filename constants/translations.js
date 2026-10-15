@@ -180,6 +180,11 @@ const translations = {
     notifyFoodLog: '飲食紀錄提醒', notifyDailySummary: '每日總結', notifyWeightLog: '體重紀錄提醒',
     notifyGoalReached: '達成目標通知', notifyAppUpdates: 'App 更新',
     notifyOffHint: '開啟通知後，就可以選擇要收到哪些提醒。',
+    // ── 食物詳情（entry.js / entry-nutrition.js）──
+    entryTitle: '食物詳情', entryName: '名稱', entryServing: '份量', entryServingsUnit: '份',
+    entryNutrition: '營養成分', entryMoreNutrition: '更多營養素', entryLoggedAt: '記錄時間', entryCategory: '餐次',
+    entryNotFound: '找不到這筆紀錄，可能已經被刪除了。',
+    entryEstimateNote: '數值是 AI 或食品資料庫的估算，改份量時會等比例調整。',
     notifyDenied: '沒有通知權限。請到手機的系統設定，允許 Calorie Tracks 傳送通知。',
     notifyWebHint: '網頁版不會發送提醒，請在手機 App 裡使用通知。',
     notifyChannel: '提醒',
@@ -372,6 +377,11 @@ const translations = {
     notifyFoodLog: 'Food log reminders', notifyDailySummary: 'Daily summary', notifyWeightLog: 'Weight log reminder',
     notifyGoalReached: 'Goal reached alerts', notifyAppUpdates: 'App updates',
     notifyOffHint: 'Turn on notifications to choose which reminders you get.',
+    // ── Entry details (entry.js / entry-nutrition.js) ──
+    entryTitle: 'Food details', entryName: 'Name', entryServing: 'Serving', entryServingsUnit: 'servings',
+    entryNutrition: 'Nutrition', entryMoreNutrition: 'More nutrition', entryLoggedAt: 'Date & time', entryCategory: 'Category',
+    entryNotFound: "This entry couldn't be found — it may have been deleted.",
+    entryEstimateNote: 'Values are estimates from AI or the food database and change in proportion when you edit the serving.',
     notifyDenied: "Notifications aren't allowed. Allow Calorie Tracks to send notifications in your phone's settings.",
     notifyWebHint: "The web version doesn't send reminders — use notifications in the phone app.",
     notifyChannel: 'Reminders',

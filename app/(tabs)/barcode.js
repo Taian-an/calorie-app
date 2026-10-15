@@ -46,6 +46,10 @@ function parseProduct(code, raw) {
         protein: num(n.proteins_100g) ?? 0,
         carbs: num(n.carbohydrates_100g) ?? 0,
         fat: num(n.fat_100g) ?? 0,
+        // 有標示才有，沒有就不記（詳細頁顯示「—」）；鈉 OFF 給的是公克，換成 mg
+        fiber: num(n.fiber_100g),
+        sugar: num(n.sugars_100g),
+        sodium: num(n.sodium_100g) != null ? num(n.sodium_100g) * 1000 : null,
       },
     },
   };
@@ -138,6 +142,9 @@ export default function BarcodeScan() {
     protein: round1(product.per100.protein * factor),
     carbs: round1(product.per100.carbs * factor),
     fat: round1(product.per100.fat * factor),
+    ...Object.fromEntries(['fiber', 'sugar', 'sodium']
+      .filter(k => product.per100[k] != null)
+      .map(k => [k, round1(product.per100[k] * factor)])),
   };
 
   const confirmLog = () => {
@@ -148,7 +155,11 @@ export default function BarcodeScan() {
       protein: totals.protein,
       carbs: totals.carbs,
       fat: totals.fat,
+      fiber: totals.fiber,
+      sugar: totals.sugar,
+      sodium: totals.sodium,
       grams: Math.round(gramsNum),
+      photoUrl: product.image ?? undefined,
       mealType,
     }, scannedAtRef.current);
     setLogged(true);

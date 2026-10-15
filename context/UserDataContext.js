@@ -330,6 +330,21 @@ export function UserDataProvider({ children }) {
     });
   }, [persist, profile, syncDayUp]);
 
+  // 改某一天的一筆食物紀錄（詳細頁改名稱、份量、餐次都走這裡）。改餐次後日誌頁會自動把它排到新的餐次底下
+  const updateMeal = useCallback((key, time, patch) => {
+    setDailyLogs(prevLogs => {
+      const log = prevLogs[key];
+      if (!log?.meals?.some(m => m.time === time)) return prevLogs;
+      const meals = log.meals.map(m => (m.time === time
+        ? { ...m, ...patch, ...(patch.mealType ? { mealType: normalizeMealType(patch.mealType) } : {}) }
+        : m));
+      const nextLogs = { ...prevLogs, [key]: { ...log, meals } };
+      persist(profile, nextLogs);
+      syncDayUp(key, nextLogs[key]);
+      return nextLogs;
+    });
+  }, [persist, profile, syncDayUp]);
+
   // 取得某一天依餐次分組的食物紀錄，永遠回傳四個餐次的完整結構
   const getMealsByType = useCallback((key) => {
     const grouped = { breakfast: [], lunch: [], dinner: [], snacks: [] };
@@ -364,6 +379,7 @@ export function UserDataProvider({ children }) {
     addMeal,
     removeMeal,
     moveMeal,
+    updateMeal,
     getDayTotals,
     getDayLog,
     getMealsByType,

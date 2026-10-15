@@ -22,6 +22,8 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
         <Stack.Protected guard={!!authEmail && onboarded}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="entry" />
+          <Stack.Screen name="entry-nutrition" />
         </Stack.Protected>
         <Stack.Protected guard={!!authEmail && !onboarded}>
           <Stack.Screen name="onboarding" />
