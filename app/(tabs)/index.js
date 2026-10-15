@@ -9,23 +9,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
 import { catchUpPlan } from '../../constants/bodyCalc';
+import { useTheme, useStyles } from '../../context/PreferencesContext';
 
-const C = {
-  primary:       '#22C55E',
-  primaryDark:   '#16A34A',
-  bg:            '#F0FDF4',
-  card:          '#FFFFFF',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  border:        '#E5E7EB',
-  macroProtein:  '#3B82F6',
-  macroCarbs:    '#F97316',
-  macroFat:      '#EF4444',
-  deficit:       '#16A34A',
-  surplus:       '#DC2626',
-  ringTrack:     '#E5E7EB',
-  ringOver:      '#F97316', // 超過目標熱量時，圓環從綠色變橘色示警
-};
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const RING_SIZE = 132;
@@ -35,6 +20,8 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 // 熱量圓環：隨已攝取熱量逐步畫出，達標時剛好形成閉環；超過目標則整圈變橘色示警
 function CalorieRing({ eaten, goal, children }) {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const progress = goal ? Math.min(eaten / goal, 1) : 0;
   const isOver = goal != null && eaten > goal;
   const animatedProgress = useRef(new Animated.Value(0)).current;
@@ -57,11 +44,11 @@ function CalorieRing({ eaten, goal, children }) {
       <Svg width={RING_SIZE} height={RING_SIZE} style={StyleSheet.absoluteFill}>
         <Circle
           cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
-          stroke={C.ringTrack} strokeWidth={RING_STROKE} fill="none"
+          stroke={C.border} strokeWidth={RING_STROKE} fill="none"
         />
         <AnimatedCircle
           cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
-          stroke={isOver ? C.ringOver : C.primary} strokeWidth={RING_STROKE} fill="none"
+          stroke={isOver ? C.warn : C.primary} strokeWidth={RING_STROKE} fill="none"
           strokeDasharray={RING_CIRCUMFERENCE}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
@@ -123,6 +110,7 @@ function getMonthCells(year, month) {
 }
 
 function MacroProgress({ label, cur, target, color }) {
+  const s = useStyles(makeStyles);
   const pct = target > 0 ? Math.min(cur / target, 1) * 100 : 0;
   return (
     <View style={s.macroWrap}>
@@ -139,6 +127,8 @@ function MacroProgress({ label, cur, target, color }) {
 
 // 一個餐次卡片。食物紀錄長按後可以拖到另一個餐次（拖曳本身由 DiaryScreen 處理，這裡只回報起點和卡片位置）
 function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, cardRef, isDropTarget, draggingTime, onDragStart, onPressOut }) {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const subtotal = Math.round(meals.reduce((sum, m) => sum + (m.energy || 0), 0));
   const target = goal != null ? Math.round(goal * MEAL_META[type].share) : null;
   const pct = target ? Math.min(subtotal / target, 1) * 100 : 0;
@@ -154,7 +144,7 @@ function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, ca
         </View>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={C.textSecondary} />
         <TouchableOpacity style={s.addBtn} onPress={onAdd} activeOpacity={0.8}>
-          <Ionicons name="add" size={20} color="#FFF" />
+          <Ionicons name="add" size={20} color={C.onPrimary} />
         </TouchableOpacity>
       </TouchableOpacity>
 
@@ -188,6 +178,8 @@ function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, ca
 }
 
 export default function DiaryScreen() {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const { lang, t } = useLanguage();
   const { profile, dailyLogs, updateProfile, getDayTotals, getMealsByType, removeMeal, moveMeal } = useUserData();
   const [selectedKey, setSelectedKey] = useState(dateKey());
@@ -460,7 +452,7 @@ export default function DiaryScreen() {
               </CalorieRing>
               {profile && (
                 <TouchableOpacity style={s.ringEditBtn} onPress={openGoalModal} activeOpacity={0.8} hitSlop={6}>
-                  <Ionicons name="pencil" size={13} color="#FFF" />
+                  <Ionicons name="pencil" size={13} color={C.onPrimary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -565,7 +557,7 @@ export default function DiaryScreen() {
                 router.push({ pathname: '/camera', params: { mealType: type } });
               }}
             >
-              <Ionicons name="camera" size={20} color="#FFF" />
+              <Ionicons name="camera" size={20} color={C.onPrimary} />
               <Text style={s.scanBtnText}>{t.scanFoodOption}</Text>
             </TouchableOpacity>
 
@@ -678,14 +670,14 @@ export default function DiaryScreen() {
                   >
                     <Text style={[
                       s.calDayNum,
-                      isFuture && { color: '#D1D5DB' },
+                      isFuture && { color: C.borderStrong },
                       cell.key === todayKey && { color: C.primaryDark },
                     ]}>
                       {cell.day}
                     </Text>
                     <View style={[
                       s.calRing,
-                      { borderColor: isFuture ? '#F3F4F6' : ringColor },
+                      { borderColor: isFuture ? C.muted : ringColor },
                       isSel && s.calRingSel,
                     ]} />
                   </TouchableOpacity>
@@ -773,7 +765,7 @@ export default function DiaryScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1, paddingHorizontal: 20 },
 
@@ -795,18 +787,18 @@ const s = StyleSheet.create({
   },
   calTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   calTodayBtn: {
-    backgroundColor: '#ECFDF5', borderRadius: 999, borderWidth: 1, borderColor: '#A7F3D0',
+    backgroundColor: C.tint, borderRadius: 999, borderWidth: 1, borderColor: C.tintStrong,
     paddingHorizontal: 14, paddingVertical: 7,
   },
   calTodayBtnText: { fontSize: 13, fontWeight: '700', color: C.primaryDark },
   calStreakBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#F9FAFB', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
+    backgroundColor: C.subtle, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7,
   },
   calStreakText: { fontSize: 12, fontWeight: '600', color: C.textSecondary },
   calStreakNum:  { fontSize: 14, fontWeight: '900', color: C.textPrimary },
   calCloseBtn: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6',
+    width: 32, height: 32, borderRadius: 16, backgroundColor: C.muted,
     alignItems: 'center', justifyContent: 'center',
   },
   calMonthRow: {
@@ -836,7 +828,7 @@ const s = StyleSheet.create({
   weekHeaderCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   weekMonthLabel:   { fontSize: 14, fontWeight: '800', color: C.textPrimary },
   todayChip: {
-    backgroundColor: '#ECFDF5', borderRadius: 999, borderWidth: 1, borderColor: '#A7F3D0',
+    backgroundColor: C.tint, borderRadius: 999, borderWidth: 1, borderColor: C.tintStrong,
     paddingHorizontal: 10, paddingVertical: 3,
   },
   todayChipText: { fontSize: 11, fontWeight: '700', color: C.primaryDark },
@@ -854,7 +846,7 @@ const s = StyleSheet.create({
   dayCircleSel:   { backgroundColor: C.primaryDark },
   dayCircleToday: { borderWidth: 2, borderColor: C.primary },
   dayNum:    { fontSize: 14, fontWeight: '700', color: C.textPrimary },
-  dayNumSel: { color: '#FFF' },
+  dayNumSel: { color: C.onPrimary },
 
   /* Cards */
   card: {
@@ -871,7 +863,7 @@ const s = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12,
     borderLeftWidth: 4, borderLeftColor: C.primary,
   },
-  tipCardWarn: { borderLeftColor: C.ringOver },
+  tipCardWarn: { borderLeftColor: C.warn },
   tipTitle: { fontSize: 14, fontWeight: '800', color: C.textPrimary, marginBottom: 6 },
   tipBody:  { fontSize: 13, color: C.textSecondary, lineHeight: 19 },
   tipBtn: {
@@ -895,7 +887,7 @@ const s = StyleSheet.create({
     position: 'absolute', bottom: 2, right: 2,
     width: 28, height: 28, borderRadius: 14, backgroundColor: C.primaryDark,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#FFF',
+    borderWidth: 2, borderColor: C.card,
   },
 
   /* 營養素進度 */
@@ -904,7 +896,7 @@ const s = StyleSheet.create({
   macroTop:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
   macroLabel: { fontSize: 12, fontWeight: '600', color: C.textSecondary },
   macroVal:   { fontSize: 12, fontWeight: '800' },
-  barBg:   { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4 },
+  barBg:   { height: 8, backgroundColor: C.muted, borderRadius: 4 },
   barFill: { height: 8, borderRadius: 4 },
 
   /* 餐次卡片 */
@@ -933,7 +925,7 @@ const s = StyleSheet.create({
   },
   mealItemRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.muted,
   },
   mealItemName: { flex: 1, fontSize: 13, fontWeight: '600', color: C.textPrimary },
   mealItemKcal: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
@@ -948,16 +940,16 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: C.primaryDark, borderRadius: 16, paddingVertical: 15, marginBottom: 18,
   },
-  scanBtnText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
+  scanBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
   uploadBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#F0FDF4', borderRadius: 16, borderWidth: 1.5, borderColor: C.primary,
+    backgroundColor: C.tint, borderRadius: 16, borderWidth: 1.5, borderColor: C.primary,
     paddingVertical: 14, marginTop: 10,
   },
   uploadBtnText: { color: C.primaryDark, fontSize: 15, fontWeight: '800' },
 
   /* 調整目標 Modal */
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },
   goalModalCard: {
     width: '100%', maxHeight: '85%', backgroundColor: C.card,
     borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20,
@@ -972,9 +964,9 @@ const s = StyleSheet.create({
   goalOption: {
     flex: 1, alignItems: 'center', gap: 3,
     paddingVertical: 14, borderRadius: 16,
-    backgroundColor: '#F9FAFB', borderWidth: 2, borderColor: 'transparent',
+    backgroundColor: C.subtle, borderWidth: 2, borderColor: 'transparent',
   },
-  goalOptionActive:      { borderColor: C.primary, backgroundColor: '#F0FDF4' },
+  goalOptionActive:      { borderColor: C.primary, backgroundColor: C.tint },
   goalOptionEmoji:       { fontSize: 24 },
   goalOptionLabel:       { fontSize: 14, fontWeight: '800', color: C.textPrimary },
   goalOptionLabelActive: { color: C.primaryDark },
@@ -982,10 +974,10 @@ const s = StyleSheet.create({
 
   activityRow: {
     flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16,
-    backgroundColor: '#F9FAFB', marginBottom: 8, gap: 12,
+    backgroundColor: C.subtle, marginBottom: 8, gap: 12,
     borderWidth: 2, borderColor: 'transparent',
   },
-  activityRowActive:   { borderColor: C.primary, backgroundColor: '#F0FDF4' },
+  activityRowActive:   { borderColor: C.primary, backgroundColor: C.tint },
   activityEmoji:       { fontSize: 24, width: 32, textAlign: 'center' },
   activityLabel:       { fontSize: 15, fontWeight: '800', color: C.textPrimary },
   activityLabelActive: { color: C.primaryDark },
@@ -993,7 +985,7 @@ const s = StyleSheet.create({
 
   goalPreview: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#ECFDF5', borderRadius: 14, borderWidth: 1, borderColor: '#A7F3D0',
+    backgroundColor: C.tint, borderRadius: 14, borderWidth: 1, borderColor: C.tintStrong,
     paddingVertical: 12, paddingHorizontal: 16, marginTop: 14,
   },
   goalPreviewLabel: { fontSize: 13, fontWeight: '700', color: C.textSecondary },
@@ -1001,7 +993,7 @@ const s = StyleSheet.create({
 
   modalButtonRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
   modalBtn:       { flex: 1, paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-  modalCancelBtn: { backgroundColor: '#9CA3AF', flex: 0, paddingHorizontal: 24 },
+  modalCancelBtn: { backgroundColor: C.textMuted, flex: 0, paddingHorizontal: 24 },
   modalSaveBtn:   { backgroundColor: C.primary },
-  modalBtnText:   { color: '#FFF', fontSize: 15, fontWeight: '800' },
+  modalBtnText:   { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
 });

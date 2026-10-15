@@ -11,6 +11,7 @@ import { authErrorMessage } from '../constants/authErrors';
 
 // 彈出視窗導回時的交還（以及手機瀏覽器交還失敗時的備援）統一在 googleRedirectLogin 處理
 import './googleRedirectLogin';
+import { useStyles } from '../context/PreferencesContext';
 
 // 還沒去 Google Cloud Console 申請對應平台的 Client ID 前，Google.useIdTokenAuthRequest 一旦被呼叫就會
 // 直接 throw，所以由呼叫端（login.js / register.js）用這個旗標決定要不要 mount 這個元件，避免把整頁弄壞。
@@ -43,6 +44,7 @@ const IN_APP_BROWSER = detectInAppBrowser();
 // 登入頁、註冊頁共用的「通過 Google 繼續」按鈕：
 // 拿到 Google 的 id_token 後直接丟給後端 /auth/google，帳號不存在就自動建立，等同一鍵完成登入或註冊。
 export default function GoogleAuthButton({ onError }) {
+  const s = useStyles(makeStyles);
   const router = useRouter();
   const { loginWithGoogle } = useUserData();
   const { t } = useLanguage();
@@ -107,13 +109,13 @@ export default function GoogleAuthButton({ onError }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   btn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 12,
-    paddingVertical: 13, backgroundColor: '#FFF',
+    borderWidth: 1.5, borderColor: C.borderStrong, borderRadius: 12,
+    paddingVertical: 13, backgroundColor: C.card,
   },
-  text: { fontSize: 14.5, fontWeight: '700', color: '#1F2937' },
+  text: { fontSize: 14.5, fontWeight: '700', color: C.textPrimary },
   btnDimmed: { opacity: 0.55 },
   inAppHint: { marginTop: 8, fontSize: 12.5, color: '#B45309', textAlign: 'center', lineHeight: 18 },
 });

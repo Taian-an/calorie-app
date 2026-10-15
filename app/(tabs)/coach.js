@@ -8,23 +8,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData } from '../../context/UserDataContext';
+import { useTheme, useStyles } from '../../context/PreferencesContext';
 
-const C = {
-  primary:       '#22C55E',
-  bg:            '#F0FDF4',
-  card:          '#FFFFFF',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  border:        '#E5E7EB',
-  bubbleUser:    '#22C55E',
-  bubbleModel:   '#FFFFFF',
-  danger:        '#DC2626',
-};
 
 let uid = 0;
 const nextId = () => `${Date.now()}-${uid++}`;
 
 export default function CoachScreen() {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const { t, lang } = useLanguage();
   const { sendCoachMessage } = useUserData();
   const [messages, setMessages] = useState(() => [
@@ -134,7 +126,7 @@ export default function CoachScreen() {
             onPress={handleSend}
             disabled={!input.trim() || sending}
           >
-            <Ionicons name="send" size={18} color="#FFFFFF" />
+            <Ionicons name="send" size={18} color={C.onPrimary} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -142,7 +134,7 @@ export default function CoachScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   flex: { flex: 1 },
   header: {
@@ -158,13 +150,13 @@ const s = StyleSheet.create({
   rowUser: { justifyContent: 'flex-end' },
   rowModel: { justifyContent: 'flex-start' },
   bubble: { maxWidth: '80%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleUser: { backgroundColor: C.bubbleUser, borderBottomRightRadius: 4 },
+  bubbleUser: { backgroundColor: C.primary, borderBottomRightRadius: 4 },
   bubbleModel: {
-    backgroundColor: C.bubbleModel, borderBottomLeftRadius: 4,
+    backgroundColor: C.card, borderBottomLeftRadius: 4,
     borderWidth: 1, borderColor: C.border,
   },
   bubbleErrorBorder: { borderColor: C.danger },
-  bubbleTextUser: { color: '#FFFFFF', fontSize: 15, lineHeight: 21 },
+  bubbleTextUser: { color: C.onPrimary, fontSize: 15, lineHeight: 21 },
   bubbleTextModel: { color: C.textPrimary, fontSize: 15, lineHeight: 21 },
   typingRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

@@ -129,8 +129,8 @@ const translations = {
     obMale: '男性', obFemale: '女性', obYears: '歲',
     obDur1m: '1 個月', obDur3m: '3 個月', obDur6m: '6 個月', obDur1y: '1 年', obDurOther: '其他',
     obBmiUnder: '過輕', obBmiHealthy: '健康', obBmiOver: '偏重', obBmiObese: '過重',
-    obMaintain: '維持目前體重', obGain: '你將增加 {n} kg', obLose: '你將減少 {n} kg',
-    obMonthlyGain: '平均每個月增加約 {n} kg', obMonthlyLose: '平均每個月減少約 {n} kg',
+    obMaintain: '維持目前體重', obGain: '你將增加 {n}', obLose: '你將減少 {n}',
+    obMonthlyGain: '平均每個月增加約 {n}', obMonthlyLose: '平均每個月減少約 {n}',
     obFinish: '完成', obContinue: '繼續', obDailyTarget: '每日建議攝取約 {n} kcal',
     // ── 登入 ──
     forgotPasswordUnavailable: '忘記密碼功能尚未開放，請聯繫客服協助重設。',
@@ -169,8 +169,17 @@ const translations = {
     tipAskCoach: '問 AI 教練',
     // ── 預估體重 ──
     estWeightTitle: '預估體重',
-    estWeightBody: '從你 {date} 量的 {w} kg 起算，之後有記錄的 {d} 天累計熱量 {net} kcal（約 7700 kcal ≈ 1 kg）。這只是估算，量了實際體重後記得更新，會從那天重新算。',
+    estWeightBody: '從你 {date} 量的 {w} 起算，之後有記錄的 {d} 天累計熱量 {net} kcal（約 7700 kcal ≈ 1 kg）。這只是估算，量了實際體重後記得更新，會從那天重新算。',
     estWeightUpdate: '更新體重',
+    // ── App 設定：外觀 / 單位 / 通知 ──
+    appearanceLight: '淺色', appearanceDark: '深色',
+    unitsMetric: '公制（m、kg、ml）', unitsImperial: '英制（ft、lb、fl oz）',
+    unitsMetricShort: '公制', unitsImperialShort: '英制',
+    obUnitsTitle: '你習慣用哪種單位？', obUnitsSub: '你選的單位會套用在 App 裡所有的測量數值，之後也可以在設定裡更改。',
+    notifyMaster: '通知', notifyTypes: '通知類型', notifyOn: '開啟', notifyOff: '關閉',
+    notifyFoodLog: '飲食紀錄提醒', notifyDailySummary: '每日總結', notifyWeightLog: '體重紀錄提醒',
+    notifyGoalReached: '達成目標通知', notifyAppUpdates: 'App 更新',
+    notifyOffHint: '開啟通知後，就可以選擇要收到哪些提醒。',
   },
   en: {
     name: 'English',
@@ -302,8 +311,8 @@ const translations = {
     obMale: 'Male', obFemale: 'Female', obYears: 'yrs',
     obDur1m: '1 month', obDur3m: '3 months', obDur6m: '6 months', obDur1y: '1 year', obDurOther: 'Other',
     obBmiUnder: 'Underweight', obBmiHealthy: 'Healthy', obBmiOver: 'Overweight', obBmiObese: 'Obese',
-    obMaintain: 'Maintain current weight', obGain: "You'll gain {n} kg", obLose: "You'll lose {n} kg",
-    obMonthlyGain: 'About {n} kg gained per month', obMonthlyLose: 'About {n} kg lost per month',
+    obMaintain: 'Maintain current weight', obGain: "You'll gain {n}", obLose: "You'll lose {n}",
+    obMonthlyGain: 'About {n} gained per month', obMonthlyLose: 'About {n} lost per month',
     obFinish: 'Finish', obContinue: 'Continue', obDailyTarget: 'Recommended daily intake: about {n} kcal',
     // ── Login ──
     forgotPasswordUnavailable: "Password reset isn't available yet. Please contact support to reset it.",
@@ -342,8 +351,17 @@ const translations = {
     tipAskCoach: 'Ask the AI coach',
     // ── Estimated weight ──
     estWeightTitle: 'Estimated weight',
-    estWeightBody: 'Starting from {w} kg on {date}, your {d} logged days since add up to {net} kcal against your TDEE (about 7,700 kcal ≈ 1 kg). This is only an estimate — when you weigh yourself, update your weight and we will start again from there.',
+    estWeightBody: 'Starting from {w} on {date}, your {d} logged days since add up to {net} kcal against your TDEE (about 7,700 kcal ≈ 1 kg). This is only an estimate — when you weigh yourself, update your weight and we will start again from there.',
     estWeightUpdate: 'Update weight',
+    // ── App settings: appearance / units / notifications ──
+    appearanceLight: 'Light', appearanceDark: 'Dark',
+    unitsMetric: 'Metric (m, kg, ml)', unitsImperial: 'Imperial (ft, lb, fl oz)',
+    unitsMetricShort: 'Metric', unitsImperialShort: 'Imperial',
+    obUnitsTitle: "What's your units?", obUnitsSub: 'The measuring system you select will be applied to all measurements in the app. You can change it later in Settings.',
+    notifyMaster: 'Notifications', notifyTypes: 'Notification types', notifyOn: 'On', notifyOff: 'Off',
+    notifyFoodLog: 'Food log reminders', notifyDailySummary: 'Daily summary', notifyWeightLog: 'Weight log reminder',
+    notifyGoalReached: 'Goal reached alerts', notifyAppUpdates: 'App updates',
+    notifyOffHint: 'Turn on notifications to choose which reminders you get.',
   },
 };
 

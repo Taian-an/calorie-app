@@ -7,17 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData, dateKey } from '../context/UserDataContext';
 import { calcBmr, activityFactor, GOAL_DELTAS } from '../constants/bodyCalc';
-
-const C = {
-  primary:       '#22C55E',
-  primaryDark:   '#16A34A',
-  bg:            '#F0FDF4',
-  card:          '#FFFFFF',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  border:        '#D1D5DB',
-  warn:          '#F97316',
-};
+import { usePreferences, useStyles } from '../context/PreferencesContext';
+import {
+  weightToDisplay, weightFromDisplay, weightUnitLabel, formatWeight,
+  heightToDisplay, heightFromDisplay, formatInches, parseInches, roundCm, roundKg,
+} from '../constants/units';
 
 const ACTIVITY_EMOJI = { sedentary: '🧘', lightly: '🚶', moderately: '🏃', very: '🏋️', extra: '🥊' };
 // labelKey 對應 translations 裡的字串，顯示時才依目前語言取值
@@ -27,7 +21,7 @@ const DURATIONS = [
   { key: '24', labelKey: 'obDur6m' },
   { key: '52', labelKey: 'obDur1y' },
 ];
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 const BUILD_MS = 2200;
 
 // 註冊/登入成功但還沒填過身體資料（profile.height 是 null）的使用者，進 App 前一定會先卡在這裡。
@@ -36,6 +30,8 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const { updateProfile } = useUserData();
+  const { C, units, setUnits } = usePreferences();
+  const s = useStyles(makeStyles);
 
   const [phase, setPhase] = useState('wizard'); // 'wizard' | 'building' | 'done'
   const [step, setStep] = useState(0);
@@ -49,6 +45,23 @@ export default function OnboardingScreen() {
   const [activity, setActivity] = useState('sedentary');
   const [result, setResult] = useState(null);
 
+  // 第三題選單位：選了就直接套用到整個 App，後面的身高、體重、目標體重也改用這個單位輸入。
+  // 內部一律存公制，換單位時把目前的值對齊到新單位的整數刻度，免得顯示 132.3 lb 這種數字
+  const chooseUnits = (u) => {
+    setUnits(u);
+    const snapW = (kg) => (u === 'imperial'
+      ? weightFromDisplay(Math.round(weightToDisplay(kg, u)), u)
+      : Math.round(kg * 2) / 2);
+    setHeight(h => heightFromDisplay(Math.round(heightToDisplay(h, u)), u));
+    setWeight(snapW);
+    setTargetWeight(snapW);
+  };
+  const imperial = units === 'imperial';
+  const weightStepper = {
+    unit: weightUnitLabel(units), step: imperial ? 1 : 0.5,
+    min: weightToDisplay(30, units), max: weightToDisplay(250, units),
+  };
+
   const next = () => setStep(s => Math.min(s + 1, TOTAL_STEPS - 1));
   const back = () => setStep(s => Math.max(s - 1, 0));
 
@@ -58,7 +71,7 @@ export default function OnboardingScreen() {
 
   // 按最後一步的「完成」：先算好結果，進入建立動畫，動畫跑完才真的存檔放行
   const startBuilding = () => {
-    const w = weight, h = height, a = age;
+    const w = roundKg(weight), h = roundCm(height), a = age;
     const bmr = calcBmr(gender, w, h, a);
     const tdee = bmr * activityFactor(activity);
     const goal = targetWeight > weight + 0.3 ? 'bulk' : targetWeight < weight - 0.3 ? 'cut' : 'maintain';
@@ -72,10 +85,10 @@ export default function OnboardingScreen() {
   };
 
   const bmi = weight / ((height / 100) ** 2);
-  const bmiTag = bmi < 18.5 ? { label: t.obBmiUnder, color: '#3B82F6' }
+  const bmiTag = bmi < 18.5 ? { label: t.obBmiUnder, color: C.info }
     : bmi < 24 ? { label: t.obBmiHealthy, color: C.primary }
     : bmi < 28 ? { label: t.obBmiOver, color: C.warn }
-    : { label: t.obBmiObese, color: '#EF4444' };
+    : { label: t.obBmiObese, color: C.required };
 
   const weightDiff = targetWeight - weight;
   const weeklyRate = Math.abs(weightDiff) / (durationWeeks / 4);
@@ -132,17 +145,44 @@ export default function OnboardingScreen() {
 
         {step === 2 && (
           <>
-            <Text style={s.title}>{t.obHeightTitle}</Text>
-            <Text style={s.subtitle}>{t.obBodySub}</Text>
-            <Stepper value={height} onChange={setHeight} unit="cm" step={1} min={100} max={230} />
+            <Text style={s.title}>{t.obUnitsTitle}</Text>
+            <Text style={s.subtitle}>{t.obUnitsSub}</Text>
+            {[
+              { key: 'metric', label: t.unitsMetric },
+              { key: 'imperial', label: t.unitsImperial },
+            ].map(u => (
+              <TouchableOpacity
+                key={u.key}
+                style={[s.unitCard, units === u.key && s.unitCardActive]}
+                onPress={() => chooseUnits(u.key)}
+                activeOpacity={0.85}
+              >
+                <Text style={[s.unitLabel, units === u.key && s.unitLabelActive]}>{u.label}</Text>
+              </TouchableOpacity>
+            ))}
           </>
         )}
 
         {step === 3 && (
           <>
+            <Text style={s.title}>{t.obHeightTitle}</Text>
+            <Text style={s.subtitle}>{t.obBodySub}</Text>
+            <Stepper
+              value={heightToDisplay(height, units)}
+              onChange={v => setHeight(heightFromDisplay(v, units))}
+              unit={imperial ? '' : 'cm'} step={1}
+              min={heightToDisplay(100, units)} max={heightToDisplay(230, units)}
+              format={imperial ? formatInches : undefined}
+              parse={imperial ? parseInches : undefined}
+            />
+          </>
+        )}
+
+        {step === 4 && (
+          <>
             <Text style={s.title}>{t.obWeightTitle}</Text>
             <Text style={s.subtitle}>{t.obBodySub}</Text>
-            <Stepper value={weight} onChange={setWeight} unit="kg" step={0.5} min={30} max={250} />
+            <Stepper value={weightToDisplay(weight, units)} onChange={v => setWeight(weightFromDisplay(v, units))} {...weightStepper} />
             <View style={[s.feedbackCard, { borderColor: bmiTag.color }]}>
               <View style={s.bmiRow}>
                 <Text style={s.bmiLabel}>BMI</Text>
@@ -152,22 +192,22 @@ export default function OnboardingScreen() {
           </>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <>
             <Text style={s.title}>{t.obTargetTitle}</Text>
             <Text style={s.subtitle}>{t.obTargetSub}</Text>
-            <Stepper value={targetWeight} onChange={setTargetWeight} unit="kg" step={0.5} min={30} max={250} />
+            <Stepper value={weightToDisplay(targetWeight, units)} onChange={v => setTargetWeight(weightFromDisplay(v, units))} {...weightStepper} />
             <View style={s.feedbackCard}>
               <Text style={s.feedbackText}>
                 {Math.abs(weightDiff) < 0.3
                   ? t.obMaintain
-                  : (weightDiff > 0 ? t.obGain : t.obLose).replace('{n}', Math.abs(weightDiff).toFixed(1))}
+                  : (weightDiff > 0 ? t.obGain : t.obLose).replace('{n}', formatWeight(Math.abs(weightDiff), units))}
               </Text>
             </View>
           </>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <>
             <Text style={s.title}>{t.obDurationTitle}</Text>
             <Text style={s.subtitle}>{t.obDurationSub}</Text>
@@ -208,14 +248,14 @@ export default function OnboardingScreen() {
             {Math.abs(weightDiff) >= 0.3 && (
               <View style={s.feedbackCard}>
                 <Text style={s.feedbackText}>
-                  {(weightDiff > 0 ? t.obMonthlyGain : t.obMonthlyLose).replace('{n}', weeklyRate.toFixed(1))}
+                  {(weightDiff > 0 ? t.obMonthlyGain : t.obMonthlyLose).replace('{n}', formatWeight(weeklyRate, units))}
                 </Text>
               </View>
             )}
           </>
         )}
 
-        {step === 6 && (
+        {step === 7 && (
           <>
             <Text style={s.title}>{t.obActivityTitle}</Text>
             <Text style={s.subtitle}>{t.obActivitySub}</Text>
@@ -251,15 +291,19 @@ export default function OnboardingScreen() {
 }
 
 // 數字可以用左右按鈕微調，也可以直接點數字叫出鍵盤輸入
-function Stepper({ value, onChange, unit, step = 1, min, max }) {
+// format / parse 給英制身高用：值是總英吋，顯示和輸入都是 5′7″ 這種寫法
+function Stepper({ value, onChange, unit, step = 1, min, max, format, parse }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
+  const show = (v) => (format ? format(v) : String(v));
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(value));
+  const [draft, setDraft] = useState(show(value));
 
   const clamp = (v) => Math.min(max, Math.max(min, v));
 
-  const openEdit = () => { setDraft(String(value)); setEditing(true); };
+  const openEdit = () => { setDraft(show(value)); setEditing(true); };
   const commit = () => {
-    const parsed = parseFloat(draft);
+    const parsed = parse ? parse(draft) : parseFloat(draft);
     if (!Number.isNaN(parsed)) onChange(clamp(+parsed.toFixed(1)));
     setEditing(false);
   };
@@ -276,18 +320,18 @@ function Stepper({ value, onChange, unit, step = 1, min, max }) {
             style={s.stepperInput}
             value={draft}
             onChangeText={setDraft}
-            keyboardType="decimal-pad"
+            keyboardType={parse ? 'default' : 'decimal-pad'}
             autoFocus
             selectTextOnFocus
             onBlur={commit}
             onSubmitEditing={commit}
           />
-          <Text style={s.stepperUnit}>{unit}</Text>
+          {!!unit && <Text style={s.stepperUnit}>{unit}</Text>}
         </View>
       ) : (
         <TouchableOpacity style={s.stepperValueWrap} onPress={openEdit} activeOpacity={0.6}>
-          <Text style={s.stepperValue}>{value}</Text>
-          <Text style={s.stepperUnit}>{unit}</Text>
+          <Text style={s.stepperValue}>{show(value)}</Text>
+          {!!unit && <Text style={s.stepperUnit}>{unit}</Text>}
         </TouchableOpacity>
       )}
 
@@ -301,6 +345,8 @@ function Stepper({ value, onChange, unit, step = 1, min, max }) {
 // 完成問卷後的「建立計劃中 0→100% → 已完成」轉場，跑完動畫才真的存檔放行進 App
 function BuildingScreen({ phase, onBuilt, result, onContinue }) {
   const { t } = useLanguage();
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
   const anim = useRef(new Animated.Value(0)).current;
   const [percent, setPercent] = useState(0);
   const checkScale = useRef(new Animated.Value(0.4)).current;
@@ -342,7 +388,7 @@ function BuildingScreen({ phase, onBuilt, result, onContinue }) {
         ) : (
           <>
             <Animated.View style={[s.checkCircle, { transform: [{ scale: checkScale }] }]}>
-              <Ionicons name="checkmark" size={48} color="#FFF" />
+              <Ionicons name="checkmark" size={48} color={C.onPrimary} />
             </Animated.View>
             <Text style={s.buildTitle}>{t.obBuilt}</Text>
             <Text style={s.buildSubtitle}>
@@ -358,11 +404,11 @@ function BuildingScreen({ phase, onBuilt, result, onContinue }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  progressTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: '#DCFCE7', overflow: 'hidden' },
+  progressTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: C.tintStrong, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: C.primary, borderRadius: 3 },
   stepCount: { fontSize: 13, fontWeight: '700', color: C.primaryDark, width: 34, textAlign: 'right' },
 
@@ -372,10 +418,10 @@ const s = StyleSheet.create({
 
   genderRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   genderCard: {
-    flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 16,
+    flex: 1, borderWidth: 1.5, borderColor: C.borderStrong, borderRadius: 16,
     paddingVertical: 32, alignItems: 'center', backgroundColor: C.card,
   },
-  genderCardActive: { borderColor: C.primary, backgroundColor: '#F0FDF4' },
+  genderCardActive: { borderColor: C.primary, backgroundColor: C.tint },
   genderEmoji: { fontSize: 40, marginBottom: 10 },
   genderLabel: { fontSize: 16, fontWeight: '700', color: C.textSecondary, textAlign: 'center' },
   genderNote: { fontSize: 13, color: C.textSecondary, marginTop: 16, lineHeight: 19 },
@@ -384,7 +430,7 @@ const s = StyleSheet.create({
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 28, marginTop: 24 },
   stepperBtn: {
     width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: C.primary,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: '#F0FDF4',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: C.tint,
   },
   stepperValueWrap: { flexDirection: 'row', alignItems: 'baseline', gap: 6, minWidth: 140, justifyContent: 'center' },
   stepperValue: { fontSize: 44, fontWeight: '900', color: C.textPrimary },
@@ -395,7 +441,7 @@ const s = StyleSheet.create({
   stepperUnit: { fontSize: 16, fontWeight: '700', color: C.textSecondary },
 
   feedbackCard: {
-    marginTop: 28, borderRadius: 14, borderWidth: 1.5, borderColor: C.border,
+    marginTop: 28, borderRadius: 14, borderWidth: 1.5, borderColor: C.borderStrong,
     backgroundColor: C.card, padding: 18, alignItems: 'center',
   },
   feedbackText: { fontSize: 15, fontWeight: '700', color: C.textPrimary },
@@ -406,11 +452,11 @@ const s = StyleSheet.create({
   durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
   durationChip: {
     paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999,
-    borderWidth: 1.5, borderColor: C.border, backgroundColor: C.card,
+    borderWidth: 1.5, borderColor: C.borderStrong, backgroundColor: C.card,
   },
   durationChipActive: { borderColor: C.primary, backgroundColor: C.primary },
   durationChipText: { fontSize: 14, fontWeight: '700', color: C.textPrimary },
-  durationChipTextActive: { color: '#FFF' },
+  durationChipTextActive: { color: C.onPrimary },
 
   customDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   customDurationInput: {
@@ -421,10 +467,10 @@ const s = StyleSheet.create({
 
   activityRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    borderWidth: 1.5, borderColor: C.border, borderRadius: 14,
+    borderWidth: 1.5, borderColor: C.borderStrong, borderRadius: 14,
     paddingVertical: 14, paddingHorizontal: 16, marginBottom: 12, backgroundColor: C.card,
   },
-  activityRowActive: { borderColor: C.primary, backgroundColor: '#F0FDF4' },
+  activityRowActive: { borderColor: C.primary, backgroundColor: C.tint },
   activityEmoji: { fontSize: 24, width: 32, textAlign: 'center' },
   activityLabel: { fontSize: 15, fontWeight: '800', color: C.textPrimary },
   activityLabelActive: { color: C.primaryDark },
@@ -432,11 +478,11 @@ const s = StyleSheet.create({
 
   footer: { paddingHorizontal: 28, paddingBottom: 24, paddingTop: 8 },
   btn: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', backgroundColor: C.primary },
-  btnText: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  btnText: { fontSize: 16, fontWeight: '800', color: C.onPrimary },
 
   buildWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   buildPercent: { fontSize: 56, fontWeight: '900', color: C.primaryDark, marginBottom: 20 },
-  buildTrack: { width: '100%', height: 10, borderRadius: 5, backgroundColor: '#DCFCE7', overflow: 'hidden', marginBottom: 28 },
+  buildTrack: { width: '100%', height: 10, borderRadius: 5, backgroundColor: C.tintStrong, overflow: 'hidden', marginBottom: 28 },
   buildFill: { height: '100%', backgroundColor: C.primary, borderRadius: 5 },
   buildTitle: { fontSize: 18, fontWeight: '800', color: C.textPrimary, textAlign: 'center', marginBottom: 8 },
   buildSubtitle: { fontSize: 14, color: C.textSecondary, textAlign: 'center' },
@@ -445,4 +491,12 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: 24,
   },
   doneBtn: { marginTop: 32, width: '100%' },
+
+  unitCard: {
+    borderRadius: 28, borderWidth: 1.5, borderColor: C.borderStrong, backgroundColor: C.card,
+    paddingVertical: 26, alignItems: 'center', marginBottom: 14,
+  },
+  unitCardActive: { borderColor: C.primary, backgroundColor: C.tint },
+  unitLabel: { fontSize: 17, fontWeight: '700', color: C.textPrimary },
+  unitLabelActive: { color: C.primaryDark, fontWeight: '800' },
 });

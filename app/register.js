@@ -8,19 +8,13 @@ import { useLanguage } from '../context/LanguageContext';
 import { useUserData } from '../context/UserDataContext';
 import GoogleAuthButton, { GOOGLE_LOGIN_ENABLED } from '../components/GoogleAuthButton';
 import { authErrorMessage } from '../constants/authErrors';
+import { useTheme, useStyles } from '../context/PreferencesContext';
 
-const C = {
-  primary:       '#22C55E',
-  primaryDark:   '#16A34A',
-  bg:            '#F0FDF4',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  border:        '#D1D5DB',
-  required:      '#EF4444',
-};
 
 // 從 login.js 的「Sign Up」連結進來。註冊成功後跟登入一樣直接放行到 (tabs)。
 export default function RegisterScreen() {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const router = useRouter();
   const { t } = useLanguage();
   const { register } = useUserData();
@@ -146,14 +140,14 @@ export default function RegisterScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
 
   title: { fontSize: 26, fontWeight: '900', color: C.textPrimary, marginBottom: 20 },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: C.border },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.borderStrong },
   dividerText: { fontSize: 12.5, fontWeight: '600', color: C.textSecondary },
 
   row: { flexDirection: 'row', gap: 12 },
@@ -163,18 +157,18 @@ const s = StyleSheet.create({
   req:   { color: C.required },
 
   input: {
-    width: '100%', borderWidth: 1.5, borderColor: C.border, borderRadius: 10,
+    width: '100%', borderWidth: 1.5, borderColor: C.borderStrong, borderRadius: 10,
     paddingVertical: 13, paddingHorizontal: 14, marginBottom: 18,
-    fontSize: 15, fontWeight: '500', color: C.textPrimary, backgroundColor: '#FFF',
+    fontSize: 15, fontWeight: '500', color: C.textPrimary, backgroundColor: C.card,
   },
 
-  error: { fontSize: 12, color: '#DC2626', marginTop: -6, marginBottom: 12 },
+  error: { fontSize: 12, color: C.danger, marginTop: -6, marginBottom: 12 },
 
   btn: {
     marginTop: 6, borderRadius: 12, paddingVertical: 15, alignItems: 'center',
     backgroundColor: C.primary,
   },
-  btnText: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  btnText: { fontSize: 16, fontWeight: '800', color: C.onPrimary },
 
   footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 22, gap: 6 },
   footerText: { fontSize: 13.5, color: C.textSecondary },

@@ -8,6 +8,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
 import MealPicker from '../../components/MealPicker';
+import { useTheme, useStyles } from '../../context/PreferencesContext';
 
 // 包裝食品營養資料來自 Open Food Facts（公開、免費、不需要金鑰），App 直接查，不經過我們的後端
 const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product';
@@ -71,6 +72,8 @@ async function lookupBarcode(input) {
 const round1 = v => Math.round(v * 10) / 10;
 
 export default function BarcodeScan() {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const { t } = useLanguage();
   const router = useRouter();
   const { profile, addMeal, getDayTotals } = useUserData();
@@ -277,7 +280,7 @@ export default function BarcodeScan() {
               value={manualCode}
               onChangeText={setManualCode}
               placeholder={t.barcodeManualPlaceholder}
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={C.textMuted}
               keyboardType="number-pad"
               returnKeyType="search"
               onSubmitEditing={() => search(manualCode)}
@@ -296,8 +299,8 @@ export default function BarcodeScan() {
 }
 
 const G = '#22C55E';
-const s = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#F0FDF4' },
+const makeStyles = (C) => StyleSheet.create({
+  flex: { flex: 1, backgroundColor: C.bg },
   scanContainer: { flex: 1, backgroundColor: '#121212' },
   cameraWrap: { flex: 1, backgroundColor: '#000', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   reticle: { width: '72%', height: 130, borderWidth: 3, borderColor: '#00E676', borderRadius: 16, opacity: 0.85 },
@@ -305,40 +308,40 @@ const s = StyleSheet.create({
   permissionText: { color: '#fff', textAlign: 'center', fontSize: 15 },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  manualBox: { backgroundColor: '#fff', padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  hint: { color: '#6B7280', fontSize: 13, textAlign: 'center', marginBottom: 10 },
-  error: { color: '#DC2626', fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 10 },
+  manualBox: { backgroundColor: C.card, padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  hint: { color: C.textSecondary, fontSize: 13, textAlign: 'center', marginBottom: 10 },
+  error: { color: C.danger, fontSize: 13, fontWeight: '600', textAlign: 'center', marginBottom: 10 },
   manualRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  manualInput: { flex: 1, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 12, paddingVertical: 11, paddingHorizontal: 14, fontSize: 16, color: '#14532D' },
+  manualInput: { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 14, fontSize: 16, color: C.textPrimary },
   lookupBtn: { minWidth: 0, paddingHorizontal: 20 },
   cancelLink: { alignSelf: 'center', paddingVertical: 12 },
-  cancelText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
+  cancelText: { color: C.textSecondary, fontSize: 14, fontWeight: '600' },
 
   resultContent: { padding: 16, gap: 14, paddingBottom: 40 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E5E7EB' },
+  card: { backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
   productRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
-  productImage: { width: 78, height: 78, borderRadius: 12, backgroundColor: '#F3F4F6' },
+  productImage: { width: 78, height: 78, borderRadius: 12, backgroundColor: C.muted },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  productName: { fontSize: 17, fontWeight: '800', color: '#14532D' },
-  productBrand: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  per100: { fontSize: 12, color: '#6B7280', marginTop: 6 },
-  label: { fontSize: 13, fontWeight: '700', color: '#6B7280', marginBottom: 8 },
+  productName: { fontSize: 17, fontWeight: '800', color: C.textPrimary },
+  productBrand: { fontSize: 13, color: C.textSecondary, marginTop: 2 },
+  per100: { fontSize: 12, color: C.textSecondary, marginTop: 6 },
+  label: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 8 },
   gramsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  gramsInput: { minWidth: 90, borderWidth: 1.5, borderColor: G, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, fontSize: 20, fontWeight: '800', color: '#14532D', textAlign: 'center' },
-  gramsUnit: { fontSize: 16, fontWeight: '700', color: '#6B7280' },
-  chip: { backgroundColor: '#DCFCE7', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12 },
-  chipText: { color: '#15803D', fontSize: 12, fontWeight: '700' },
-  totalKcal: { fontSize: 32, fontWeight: '900', color: '#14532D' },
-  macros: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  mealLine: { fontSize: 14, color: '#6B7280', marginTop: 10 },
+  gramsInput: { minWidth: 90, borderWidth: 1.5, borderColor: G, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, fontSize: 20, fontWeight: '800', color: C.textPrimary, textAlign: 'center' },
+  gramsUnit: { fontSize: 16, fontWeight: '700', color: C.textSecondary },
+  chip: { backgroundColor: C.tintStrong, borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12 },
+  chipText: { color: C.primaryDark, fontSize: 12, fontWeight: '700' },
+  totalKcal: { fontSize: 32, fontWeight: '900', color: C.textPrimary },
+  macros: { fontSize: 14, color: C.textSecondary, marginTop: 4 },
+  mealLine: { fontSize: 14, color: C.textSecondary, marginTop: 10 },
   remaining: { fontSize: 14, fontWeight: '700', color: G, marginTop: 6 },
   saved: { fontSize: 15, fontWeight: '800', color: G, marginTop: 10 },
   btnRow: { flexDirection: 'row', gap: 12, justifyContent: 'center' },
   btn: { paddingVertical: 13, paddingHorizontal: 26, borderRadius: 25, minWidth: 120, alignItems: 'center' },
   btnPrimary: { backgroundColor: G },
-  btnGhost: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: G },
+  btnGhost: { backgroundColor: C.card, borderWidth: 1.5, borderColor: G },
   btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  btnGhostText: { color: '#15803D' },
-  credit: { fontSize: 11, color: '#9CA3AF', textAlign: 'center' },
+  btnText: { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
+  btnGhostText: { color: C.primaryDark },
+  credit: { fontSize: 11, color: C.textMuted, textAlign: 'center' },
 });

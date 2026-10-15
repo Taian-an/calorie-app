@@ -1,6 +1,6 @@
 import {
   View, Text, Image, TouchableOpacity, TextInput,
-  StyleSheet, ScrollView, SafeAreaView, Modal, Platform,
+  StyleSheet, ScrollView, SafeAreaView, Modal, Platform, Switch,
 } from 'react-native';
 import { useCallback, useState } from 'react';
 import axios from 'axios';
@@ -11,25 +11,29 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey } from '../../context/UserDataContext';
 import { calcBmr, activityFactor, GOAL_DELTAS } from '../../constants/bodyCalc';
 import translations, { LANG_KEYS } from '../../constants/translations';
+import { usePreferences, useStyles, NOTIFY_TYPES } from '../../context/PreferencesContext';
+import {
+  formatHeight, formatWeight, formatInches, parseInches,
+  heightToDisplay, heightFromDisplay, weightToDisplay, weightFromDisplay, weightUnitLabel, roundCm, roundKg,
+} from '../../constants/units';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
 
-const C = {
-  primary:       '#22C55E',
-  primaryDark:   '#16A34A',
-  bg:            '#F0FDF4',
-  card:          '#FFFFFF',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  border:        '#E5E7EB',
-};
-
-function bmiInfo(val, t) {
-  if (val < 18.5) return { label: t.bmiUnder  ?? 'Underweight', color: '#3B82F6', bg: '#EFF6FF' };
-  if (val < 24)   return { label: t.bmiNormal ?? 'Normal',      color: '#22C55E', bg: '#F0FDF4' };
-  if (val < 28)   return { label: t.bmiOver   ?? 'Overweight',  color: '#F97316', bg: '#FFF7ED' };
-  return             { label: t.bmiObese  ?? 'Obese',       color: '#EF4444', bg: '#FEF2F2' };
+function bmiInfo(val, t, C) {
+  if (val < 18.5) return { label: t.bmiUnder  ?? 'Underweight', color: C.info,     bg: C.infoSoft };
+  if (val < 24)   return { label: t.bmiNormal ?? 'Normal',      color: C.primary,  bg: C.tint };
+  if (val < 28)   return { label: t.bmiOver   ?? 'Overweight',  color: C.warn,     bg: C.warnSoft };
+  return             { label: t.bmiObese  ?? 'Obese',       color: C.required, bg: C.dangerSoft };
 }
+
+const NOTIFY_LABEL_KEYS = {
+  foodLog: 'notifyFoodLog', dailySummary: 'notifyDailySummary', weightLog: 'notifyWeightLog',
+  goalReached: 'notifyGoalReached', appUpdates: 'notifyAppUpdates',
+};
+const NOTIFY_ICONS = {
+  foodLog: 'restaurant-outline', dailySummary: 'pulse-outline', weightLog: 'scale-outline',
+  goalReached: 'trophy-outline', appUpdates: 'download-outline',
+};
 
 // 標準無頭像圖框——新帳號一律用這個，不再提供內建卡通頭像可選
 export const AVATARS = {
@@ -51,6 +55,8 @@ const ACTIVITY_EMOJI = {
 
 // ── Sub-components ────────────────────────────────────────────────
 function StatCard({ value, unit, label, color, bg, onInfoPress }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
   return (
     <View style={[s.statCard, { backgroundColor: bg ?? C.card }]}>
       <TouchableOpacity style={s.statInfoBtn} onPress={onInfoPress} hitSlop={8} activeOpacity={0.6}>
@@ -65,6 +71,8 @@ function StatCard({ value, unit, label, color, bg, onInfoPress }) {
 
 // 一列設定/資料：左邊 icon+標題，右邊值＋箭頭（onPress 為空時純顯示）
 function SettingRow({ icon, label, value, valueColor, onPress, isLast }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
   const inner = (
     <View style={[s.settingRow, !isLast && s.settingRowBorder]}>
       <View style={s.settingLeft}>
@@ -92,6 +100,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { lang, setLang, t } = useLanguage();
   const { profile, updateProfile, authEmail, logout, deleteAccount, refreshProfile } = useUserData();
+  const { C, units, setUnits, appearance, setAppearance, notifications } = usePreferences();
+  const s = useStyles(makeStyles);
   const [deleting, setDeleting] = useState(false);
 
   // 刪除帳號要二次確認（破壞性、不可復原）。原生用系統 Alert 的 destructive 樣式，網頁版沒有 Alert 按鈕，改用 window.confirm
@@ -120,6 +130,9 @@ export default function ProfileScreen() {
   };
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLangModal, setShowLangModal] = useState(false);
+  const [showAppearanceModal, setShowAppearanceModal] = useState(false);
+  const [showUnitsModal, setShowUnitsModal] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [infoModal, setInfoModal] = useState(null); // 'bmi' | 'tdee' | 'bmr' | null —— 統計方框的公式說明
   const [feedbackText, setFeedbackText] = useState('');
@@ -164,14 +177,17 @@ export default function ProfileScreen() {
   const [weight,   setWeight]   = useState('');
   const [activity, setActivity] = useState('sedentary');
 
+  const imperial = units === 'imperial';
+  const heightText = (cm) => (imperial ? formatInches(heightToDisplay(cm, units)) : String(heightToDisplay(cm, units)));
+
   const openEditModal = () => {
     if (profile) {
       setName(profile.name ?? '');
       setAvatarKey(profile.avatarKey ?? 'default');
       setAge(String(profile.age));
       setGender(profile.gender);
-      setHeight(String(profile.height));
-      setWeight(String(profile.weight));
+      setHeight(heightText(profile.height));
+      setWeight(String(weightToDisplay(profile.weight, units)));
       setActivity(profile.activity);
     }
     setShowEditModal(true);
@@ -179,7 +195,15 @@ export default function ProfileScreen() {
 
   const handleSave = () => {
     if (!age || !height || !weight) return;
-    const w = parseFloat(weight), h = parseFloat(height), a = parseFloat(age);
+    // 沒改過的欄位沿用原本的公制值，不然 kg→lb→kg 來回換算會讓體重每存一次就偏一點
+    const h = profile && height === heightText(profile.height)
+      ? profile.height
+      : roundCm(heightFromDisplay(imperial ? parseInches(height) : parseFloat(height), units));
+    const w = profile && weight === String(weightToDisplay(profile.weight, units))
+      ? profile.weight
+      : roundKg(weightFromDisplay(parseFloat(weight), units));
+    const a = parseFloat(age);
+    if (!(h > 0) || !(w > 0) || !(a > 0)) return;
     const bmr = calcBmr(gender, w, h, a);
     const tdee = bmr * activityFactor(activity);
     // 保留首頁選的目標模式（增肌/減脂/維持），依新 TDEE 重算目標熱量
@@ -259,13 +283,16 @@ export default function ProfileScreen() {
           age={age} setAge={setAge} gender={gender} setGender={setGender}
           height={height} setHeight={setHeight} weight={weight} setWeight={setWeight}
           activity={activity} setActivity={setActivity}
+          units={units}
         />
       </SafeAreaView>
     );
   }
 
   const bmi = profile.weight / Math.pow(profile.height / 100, 2);
-  const bmiData = bmiInfo(bmi, t);
+  const bmiData = bmiInfo(bmi, t, C);
+  const appearanceLabel = { light: t.appearanceLight, dark: t.appearanceDark, system: t.appearanceSystem }[appearance];
+  const unitsLabel = units === 'imperial' ? t.unitsImperialShort : t.unitsMetricShort;
   const genderLabel = (profile.gender === 'male' ? t.male : profile.gender === 'female' ? t.female : t.genderOther)?.replace(/^[^\s]+\s/, '');
 
   return (
@@ -279,7 +306,7 @@ export default function ProfileScreen() {
           </View>
           {!!profile.name && <Text style={s.heroName}>{profile.name}</Text>}
           <Text style={s.heroBio}>
-            {profile.age}{t.ageUnit}・{genderLabel}・{profile.height} cm・{profile.weight} kg
+            {profile.age}{t.ageUnit}・{genderLabel}・{formatHeight(profile.height, units)}・{formatWeight(profile.weight, units)}
           </Text>
           <TouchableOpacity style={s.editBtn} activeOpacity={0.8} onPress={openEditModal}>
             <Ionicons name="pencil-outline" size={14} color="#FFF" />
@@ -292,8 +319,8 @@ export default function ProfileScreen() {
           {/* ── BMI / TDEE / BMR 統計方框 ── */}
           <View style={s.statsRow}>
             <StatCard value={bmi.toFixed(1)} label={`BMI・${bmiData.label}`} color={bmiData.color} bg={bmiData.bg} onInfoPress={() => setInfoModal('bmi')} />
-            <StatCard value={Math.round(profile.tdee).toLocaleString()} unit="kcal" label="TDEE" color={C.primaryDark} bg="#F0FDF4" onInfoPress={() => setInfoModal('tdee')} />
-            <StatCard value={Math.round(profile.bmr).toLocaleString()} unit="kcal" label="BMR" color="#8B5CF6" bg="#F5F3FF" onInfoPress={() => setInfoModal('bmr')} />
+            <StatCard value={Math.round(profile.tdee).toLocaleString()} unit="kcal" label="TDEE" color={C.primaryDark} bg={C.tint} onInfoPress={() => setInfoModal('tdee')} />
+            <StatCard value={Math.round(profile.bmr).toLocaleString()} unit="kcal" label="BMR" color={C.purple} bg={C.purpleSoft} onInfoPress={() => setInfoModal('bmr')} />
           </View>
 
           {/* ── Personal Info ── */}
@@ -302,8 +329,8 @@ export default function ProfileScreen() {
             <View style={s.divider} />
             <SettingRow icon="person-outline"  label={t.gender} value={genderLabel} onPress={openEditModal} />
             <SettingRow icon="calendar-outline" label={t.age}    value={`${profile.age} ${t.ageUnit}`} onPress={openEditModal} />
-            <SettingRow icon="resize-outline"  label={t.height} value={`${profile.height} cm`} onPress={openEditModal} />
-            <SettingRow icon="scale-outline"   label={t.weight} value={`${profile.weight} kg`} onPress={openEditModal} />
+            <SettingRow icon="resize-outline"  label={t.height} value={formatHeight(profile.height, units)} onPress={openEditModal} />
+            <SettingRow icon="scale-outline"   label={t.weight} value={formatWeight(profile.weight, units)} onPress={openEditModal} />
             <SettingRow icon="walk-outline"    label={t.activityLevel} value={t.activities?.find(a => a.key === profile.activity)?.label} onPress={openEditModal} />
             <SettingRow icon="calculator-outline" label="BMI" value={`${bmi.toFixed(1)}・${bmiData.label}`} valueColor={bmiData.color} isLast />
           </View>
@@ -316,9 +343,9 @@ export default function ProfileScreen() {
             <Text style={s.cardTitle}>⚙️ {t.appSettings}</Text>
             <View style={s.divider} />
             <SettingRow icon="language-outline" label={t.languageLabel} value={t.name} onPress={() => setShowLangModal(true)} />
-            <SettingRow icon="contrast-outline" label={t.appearanceLabel} value={t.appearanceSystem} onPress={() => {}} />
-            <SettingRow icon="notifications-outline" label={t.setNotify} onPress={() => {}} />
-            <SettingRow icon="options-outline"  label={t.setUnits} onPress={() => {}} />
+            <SettingRow icon="contrast-outline" label={t.appearanceLabel} value={appearanceLabel} onPress={() => setShowAppearanceModal(true)} />
+            <SettingRow icon="notifications-outline" label={t.setNotify} value={notifications.enabled ? t.notifyOn : t.notifyOff} onPress={() => setShowNotifyModal(true)} />
+            <SettingRow icon="options-outline"  label={t.setUnits} value={unitsLabel} onPress={() => setShowUnitsModal(true)} />
             <SettingRow icon="shield-checkmark-outline" label={t.setPrivacy} onPress={() => {}} />
             <SettingRow icon="chatbox-ellipses-outline" label={t.sendFeedback} onPress={() => setShowFeedbackModal(true)} />
             <SettingRow icon="information-circle-outline" label={t.setAbout} onPress={() => {}} isLast />
@@ -339,6 +366,7 @@ export default function ProfileScreen() {
         age={age} setAge={setAge} gender={gender} setGender={setGender}
         height={height} setHeight={setHeight} weight={weight} setWeight={setWeight}
         activity={activity} setActivity={setActivity}
+        units={units}
       />
 
       {/* Language Modal */}
@@ -375,6 +403,35 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* 外觀：淺色 / 深色 / 跟隨系統 */}
+      <OptionModal
+        visible={showAppearanceModal}
+        onClose={() => setShowAppearanceModal(false)}
+        title={t.appearanceLabel}
+        options={[
+          { key: 'light', label: t.appearanceLight },
+          { key: 'dark', label: t.appearanceDark },
+          { key: 'system', label: t.appearanceSystem },
+        ]}
+        selected={appearance}
+        onSelect={setAppearance}
+      />
+
+      {/* 單位：公制 / 英制，全 App 的身高體重都跟著換 */}
+      <OptionModal
+        visible={showUnitsModal}
+        onClose={() => setShowUnitsModal(false)}
+        title={t.setUnits}
+        options={[
+          { key: 'metric', label: t.unitsMetric },
+          { key: 'imperial', label: t.unitsImperial },
+        ]}
+        selected={units}
+        onSelect={setUnits}
+      />
+
+      <NotificationsModal visible={showNotifyModal} onClose={() => setShowNotifyModal(false)} t={t} />
 
       {/* Feedback Modal */}
       <Modal
@@ -487,14 +544,92 @@ export default function ProfileScreen() {
   );
 }
 
+// ── 單選清單 Modal（外觀、單位共用，樣式跟語言選單一樣）────────────────
+function OptionModal({ visible, onClose, title, options, selected, onSelect }) {
+  const s = useStyles(makeStyles);
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.langModalCard}>
+          <Text style={s.modalTitle}>{title}</Text>
+          {options.map(opt => {
+            const isActive = selected === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[s.langOption, isActive && s.langOptionActive]}
+                onPress={() => { onSelect(opt.key); onClose(); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.langOptionName, isActive && s.langOptionNameActive]}>{opt.label}</Text>
+                {isActive && <Text style={s.langOptionCheck}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// ── 通知設定 Modal：總開關打開後才能選要收哪些通知 ─────────────────────
+// 目前只存偏好；實際排程推播要等之後接 expo-notifications
+function NotificationsModal({ visible, onClose, t }) {
+  const { C, notifications, setNotification } = usePreferences();
+  const s = useStyles(makeStyles);
+  const switchColors = { trackColor: { false: C.switchOff, true: C.primary }, thumbColor: '#FFFFFF', activeThumbColor: '#FFFFFF', ios_backgroundColor: C.switchOff };
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.langModalCard}>
+          <Text style={s.modalTitle}>{t.setNotify}</Text>
+          <View style={[s.notifyRow, s.notifyMasterRow]}>
+            <View style={s.settingLeft}>
+              <Ionicons name="notifications-outline" size={20} color={C.primaryDark} />
+              <Text style={s.notifyMasterLabel}>{t.notifyMaster}</Text>
+            </View>
+            <Switch
+              value={notifications.enabled}
+              onValueChange={v => setNotification('enabled', v)}
+              {...switchColors}
+            />
+          </View>
+          {notifications.enabled ? (
+            <>
+              <Text style={s.notifySection}>{t.notifyTypes}</Text>
+              {NOTIFY_TYPES.map((key, i) => (
+                <View key={key} style={[s.notifyRow, i < NOTIFY_TYPES.length - 1 && s.settingRowBorder]}>
+                  <View style={s.settingLeft}>
+                    <Ionicons name={NOTIFY_ICONS[key]} size={18} color={C.primaryDark} />
+                    <Text style={s.settingLabel}>{t[NOTIFY_LABEL_KEYS[key]]}</Text>
+                  </View>
+                  <Switch
+                    value={!!notifications[key]}
+                    onValueChange={v => setNotification(key, v)}
+                    {...switchColors}
+                  />
+                </View>
+              ))}
+            </>
+          ) : (
+            <Text style={s.notifyHint}>{t.notifyOffHint}</Text>
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 // ── Edit Profile Modal ─────────────────────────────────────────────
 function EditProfileModal({
   visible, onClose, onSave, t,
   name, setName, avatarKey, setAvatarKey,
   age, setAge, gender, setGender,
   height, setHeight, weight, setWeight,
-  activity, setActivity,
+  activity, setActivity, units,
 }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
   // 從手機相簿選一張照片當頭像，直接把選到的本機 uri 存進 avatarKey
   const pickAvatarFromLibrary = async () => {
     if (Platform.OS !== 'web') {
@@ -569,16 +704,16 @@ function EditProfileModal({
             <Text style={[s.sectionLabel, { marginTop: 16 }]}>{t.basicInfo}</Text>
             <View style={s.statRow}>
               {[
-                { label: t.height, value: height, setter: setHeight, placeholder: t.heightUnit },
-                { label: t.weight, value: weight, setter: setWeight, placeholder: t.weightUnit },
-              ].map(({ label, value, setter, placeholder }) => (
+                { label: t.height, value: height, setter: setHeight, placeholder: units === 'imperial' ? `5′7″` : 'cm', numeric: units !== 'imperial' },
+                { label: `${t.weight} (${weightUnitLabel(units)})`, value: weight, setter: setWeight, placeholder: weightUnitLabel(units), numeric: true },
+              ].map(({ label, value, setter, placeholder, numeric }) => (
                 <View key={label} style={s.statBox}>
                   <Text style={s.statLabel}>{label}</Text>
                   <TextInput
                     style={s.statInput}
                     value={value}
                     onChangeText={setter}
-                    keyboardType="numeric"
+                    keyboardType={numeric ? 'numeric' : 'default'}
                     placeholder={placeholder}
                     placeholderTextColor={C.textSecondary}
                   />
@@ -627,18 +762,18 @@ function EditProfileModal({
 }
 
 // ── Styles ────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   emptyState: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
   emptyEmoji: { fontSize: 56, marginBottom: 16 },
   emptyText:  { fontSize: 15, color: C.textSecondary, marginBottom: 20 },
   editBtnSolid: { backgroundColor: C.primary, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 32 },
-  editBtnSolidText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
+  editBtnSolidText: { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
 
   /* Hero */
   hero: {
-    backgroundColor: C.primaryDark,
+    backgroundColor: C.hero,
     alignItems: 'center',
     paddingTop: 36,
     paddingBottom: 32,
@@ -647,14 +782,14 @@ const s = StyleSheet.create({
   },
   avatarWrap: { marginBottom: 14 },
   avatar:     { width: 96, height: 96, borderRadius: 48, borderWidth: 4, borderColor: '#FFF' },
-  heroName:   { fontSize: 20, fontWeight: '900', color: '#FFF', letterSpacing: 0.3 },
+  heroName:   { fontSize: 20, fontWeight: '900', color: C.onPrimary, letterSpacing: 0.3 },
   heroBio:    { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 5, fontWeight: '500' },
   editBtn:    {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginTop: 16, paddingHorizontal: 20, paddingVertical: 9,
     borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)',
   },
-  editBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  editBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
 
   body: { paddingHorizontal: 18, paddingTop: 20 },
 
@@ -692,9 +827,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 13,
   },
-  settingRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  settingRowBorder: { borderBottomWidth: 1, borderBottomColor: C.muted },
   settingLeft:    { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
-  settingIconBox: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center' },
+  settingIconBox: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.tint, justifyContent: 'center', alignItems: 'center' },
   settingLabel:   { fontSize: 14, fontWeight: '600', color: C.textPrimary },
   settingRight:   { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   settingValue:   { fontSize: 13, fontWeight: '700', color: C.textSecondary },
@@ -709,19 +844,19 @@ const s = StyleSheet.create({
   },
   logoutBtnText: { fontSize: 13, fontWeight: '700', color: C.textSecondary },
   deleteAccountBtn: { alignSelf: 'center', marginTop: 14, paddingVertical: 6, paddingHorizontal: 12 },
-  deleteAccountText: { fontSize: 13, fontWeight: '600', color: '#E5484D' },
+  deleteAccountText: { fontSize: 13, fontWeight: '600', color: C.danger },
   authBtn:        { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   authBtnPrimary: { backgroundColor: C.primary },
-  authBtnText:    { fontSize: 14, fontWeight: '800', color: '#FFF' },
+  authBtnText:    { fontSize: 14, fontWeight: '800', color: C.onPrimary },
   authHint:  { fontSize: 11, color: C.textSecondary, marginTop: 10, textAlign: 'center' },
 
   /* Footer */
   version:    { textAlign: 'center', fontSize: 12, color: C.textSecondary, fontWeight: '600', marginTop: 4 },
-  versionSub: { textAlign: 'center', fontSize: 10, color: '#9CA3AF', marginTop: 4 },
+  versionSub: { textAlign: 'center', fontSize: 10, color: C.textMuted, marginTop: 4 },
 
   /* Modals（共用） */
-  modalOverlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 32 },
-  modalOverlayBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalOverlay:       { flex: 1, backgroundColor: C.overlay, justifyContent: 'center', padding: 32 },
+  modalOverlayBottom: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },
   modalTitle: { fontSize: 17, fontWeight: '800', color: C.textPrimary, marginBottom: 16, textAlign: 'center' },
 
   /* Language Modal */
@@ -734,9 +869,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 13, paddingHorizontal: 14,
     borderRadius: 12, marginBottom: 6,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: C.subtle,
   },
-  langOptionActive:     { backgroundColor: '#F0FDF4', borderWidth: 2, borderColor: C.primary },
+  langOptionActive:     { backgroundColor: C.tint, borderWidth: 2, borderColor: C.primary },
   langOptionName:       { flex: 1, fontSize: 15, fontWeight: '600', color: C.textPrimary },
   langOptionNameActive: { color: C.primaryDark, fontWeight: '800' },
   langOptionCheck:      { fontSize: 16, color: C.primary, fontWeight: '800' },
@@ -748,7 +883,14 @@ const s = StyleSheet.create({
     fontSize: 14, color: C.textPrimary,
   },
   feedbackMsg:      { fontSize: 12, color: C.primaryDark, marginTop: 10, textAlign: 'center', fontWeight: '600' },
-  feedbackMsgError: { color: '#DC2626' },
+  feedbackMsgError: { color: C.danger },
+
+  /* Notifications Modal */
+  notifyRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 },
+  notifyMasterRow:   { paddingHorizontal: 14, borderRadius: 14, backgroundColor: C.subtle, marginBottom: 6 },
+  notifyMasterLabel: { fontSize: 16, fontWeight: '800', color: C.textPrimary },
+  notifySection:     { fontSize: 12, fontWeight: '700', color: C.textSecondary, marginTop: 10, marginBottom: 2 },
+  notifyHint:        { fontSize: 13, color: C.textSecondary, textAlign: 'center', marginTop: 12, lineHeight: 19 },
 
   /* Edit Modal */
   editModalCard: {
@@ -779,7 +921,7 @@ const s = StyleSheet.create({
   toggleRow:        { flexDirection: 'row', gap: 10 },
   genderNote:       { fontSize: 12, color: C.textSecondary, marginTop: 8, lineHeight: 17 },
   toggleBtn:        { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 2, borderColor: C.border, alignItems: 'center' },
-  toggleBtnActive:  { borderColor: C.primary, backgroundColor: '#F0FDF4' },
+  toggleBtnActive:  { borderColor: C.primary, backgroundColor: C.tint },
   toggleText:       { fontSize: 15, fontWeight: '700', color: C.textSecondary },
   toggleTextActive: { color: C.primaryDark },
 
@@ -794,10 +936,10 @@ const s = StyleSheet.create({
 
   activityRow: {
     flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16,
-    backgroundColor: '#F9FAFB', marginBottom: 8, gap: 12,
+    backgroundColor: C.subtle, marginBottom: 8, gap: 12,
     borderWidth: 2, borderColor: 'transparent',
   },
-  activityRowActive:   { borderColor: C.primary, backgroundColor: '#F0FDF4' },
+  activityRowActive:   { borderColor: C.primary, backgroundColor: C.tint },
   activityEmoji:       { fontSize: 24, width: 32, textAlign: 'center' },
   activityLabel:       { fontSize: 15, fontWeight: '800', color: C.textPrimary },
   activityLabelActive: { color: C.primaryDark },
@@ -805,8 +947,8 @@ const s = StyleSheet.create({
 
   modalButtonRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
   btn:            { flex: 1, paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-  cancelBtn:      { backgroundColor: '#F3F4F6', flex: 0, paddingHorizontal: 24 },
+  cancelBtn:      { backgroundColor: C.muted, flex: 0, paddingHorizontal: 24 },
   saveBtn:        { backgroundColor: C.primary },
-  saveBtnDisabled:{ backgroundColor: '#A7F3D0' },
-  btnText:        { color: '#FFF', fontSize: 15, fontWeight: '800' },
+  saveBtnDisabled:{ backgroundColor: C.tintStrong },
+  btnText:        { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
 });

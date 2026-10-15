@@ -9,20 +9,14 @@ import { useUserData } from '../context/UserDataContext';
 import GoogleAuthButton, { GOOGLE_LOGIN_ENABLED } from '../components/GoogleAuthButton';
 import { authErrorMessage } from '../constants/authErrors';
 import { takePendingGoogleIdToken } from '../components/googleRedirectLogin';
+import { useTheme, useStyles } from '../context/PreferencesContext';
 
-const C = {
-  primary:       '#22C55E',
-  primaryDark:   '#16A34A',
-  bg:            '#F0FDF4',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  border:        '#D1D5DB',
-  required:      '#EF4444',
-};
 
 // 進 App 的強制關卡：未登入只會看到這頁，登入成功才放行到 (tabs)。
 // 沒有帳號就走下面的「Sign Up」連結去 /register。
 export default function LoginScreen() {
+  const { C } = useTheme();
+  const s = useStyles(makeStyles);
   const router = useRouter();
   const { t } = useLanguage();
   const { login, loginWithGoogle } = useUserData();
@@ -131,7 +125,7 @@ export default function LoginScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
 
@@ -139,28 +133,28 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 14, fontWeight: '500', color: C.textSecondary, marginBottom: 24 },
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: C.border },
+  dividerLine: { flex: 1, height: 1, backgroundColor: C.borderStrong },
   dividerText: { fontSize: 12.5, fontWeight: '600', color: C.textSecondary },
 
   label: { fontSize: 13, fontWeight: '700', color: C.textPrimary, marginBottom: 6 },
   req:   { color: C.required },
 
   input: {
-    width: '100%', borderWidth: 1.5, borderColor: C.border, borderRadius: 10,
+    width: '100%', borderWidth: 1.5, borderColor: C.borderStrong, borderRadius: 10,
     paddingVertical: 13, paddingHorizontal: 14, marginBottom: 18,
-    fontSize: 15, fontWeight: '500', color: C.textPrimary, backgroundColor: '#FFF',
+    fontSize: 15, fontWeight: '500', color: C.textPrimary, backgroundColor: C.card,
   },
 
   forgotWrap: { alignSelf: 'flex-start', marginBottom: 4, marginTop: -6 },
   forgot: { fontSize: 13, fontWeight: '600', color: C.primaryDark },
 
-  error: { fontSize: 12, color: '#DC2626', marginTop: 10, marginBottom: 2 },
+  error: { fontSize: 12, color: C.danger, marginTop: 10, marginBottom: 2 },
 
   btn: {
     marginTop: 22, borderRadius: 12, paddingVertical: 15, alignItems: 'center',
     backgroundColor: C.primary,
   },
-  btnText: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+  btnText: { fontSize: 16, fontWeight: '800', color: C.onPrimary },
 
   footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 22, gap: 6 },
   footerText: { fontSize: 13.5, color: C.textSecondary },

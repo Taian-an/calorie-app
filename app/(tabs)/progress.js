@@ -5,21 +5,9 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, MICRO_KEYS } from '../../context/UserDataContext';
+import { usePreferences, useStyles } from '../../context/PreferencesContext';
+import { formatWeight, formatWeightDelta, weightToDisplay, weightUnitLabel } from '../../constants/units';
 
-const C = {
-  primary:       '#22C55E',
-  primaryDark:   '#16A34A',
-  bg:            '#F0FDF4',
-  card:          '#FFFFFF',
-  textPrimary:   '#14532D',
-  textSecondary: '#6B7280',
-  macroProtein:  '#3B82F6',
-  macroCarbs:    '#F97316',
-  macroFat:      '#EF4444',
-  surplus:       '#DC2626',
-  chip:          '#F9FAFB',
-  chipBorder:    '#E5E7EB',
-};
 
 const CHART_HEIGHT = 160;
 const DAYS_SHOWN = 7;
@@ -41,6 +29,8 @@ const MICRO_UNITS = {
 };
 
 function DayBar({ label, totals, scaleMax, isToday }) {
+  const { C } = usePreferences();
+  const s = useStyles(makeStyles);
   const energy = totals?.energy ?? 0;
   const barHeight = energy > 0 ? Math.max((energy / scaleMax) * CHART_HEIGHT, 4) : 0;
   const proteinKcal = (totals?.protein ?? 0) * 4;
@@ -65,6 +55,8 @@ function DayBar({ label, totals, scaleMax, isToday }) {
 }
 
 export default function ProgressScreen() {
+  const { C, units } = usePreferences();
+  const s = useStyles(makeStyles);
   const { t } = useLanguage();
   const router = useRouter();
   const { profile, dailyLogs, getDayTotals } = useUserData();
@@ -283,9 +275,9 @@ export default function ProgressScreen() {
                 <View style={s.weightRow}>
                   <Text style={s.avgLabel}>⚖️ {t.weightChange}</Text>
                   <Text style={s.weightText}>
-                    {startWeight} kg → {currentWeight} kg
+                    {formatWeight(startWeight, units)} → {formatWeight(currentWeight, units)}
                     <Text style={[s.weightDelta, { color: deltaGood ? C.primaryDark : C.surplus }]}>
-                      {'  '}{weightDelta > 0 ? '+' : ''}{weightDelta} kg
+                      {'  '}{formatWeightDelta(weightDelta, units)}
                     </Text>
                   </Text>
                 </View>
@@ -299,15 +291,15 @@ export default function ProgressScreen() {
           <View style={s.card}>
             <Text style={s.cardTitle}>🔮 {t.estWeightTitle}</Text>
             <Text style={s.estValue}>
-              {estimate.weight} <Text style={s.avgUnit}>kg</Text>
+              {weightToDisplay(estimate.weight, units)} <Text style={s.avgUnit}>{weightUnitLabel(units)}</Text>
               <Text style={[s.weightDelta, { color: C.textSecondary }]}>
-                {'  '}{estimate.delta > 0 ? '+' : ''}{estimate.delta} kg
+                {'  '}{formatWeightDelta(estimate.delta, units)}
               </Text>
             </Text>
             <Text style={s.estBody}>
               {t.estWeightBody
                 .replace('{date}', estimate.baseLabel)
-                .replace('{w}', estimate.base)
+                .replace('{w}', formatWeight(estimate.base, units))
                 .replace('{d}', estimate.days)
                 .replace('{net}', `${estimate.net > 0 ? '+' : ''}${estimate.net}`)}
             </Text>
@@ -380,7 +372,7 @@ export default function ProgressScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (C) => StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1, paddingHorizontal: 20 },
 
@@ -391,15 +383,15 @@ const s = StyleSheet.create({
   rangeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   rangeChip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
-    backgroundColor: C.chip, borderWidth: 1, borderColor: C.chipBorder,
+    backgroundColor: C.subtle, borderWidth: 1, borderColor: C.border,
   },
   rangeChipSel:     { backgroundColor: C.primary, borderColor: C.primary },
   rangeChipText:    { fontSize: 12, fontWeight: '700', color: C.textSecondary },
-  rangeChipTextSel: { color: '#FFFFFF' },
+  rangeChipTextSel: { color: C.onPrimary },
 
   macroGrid: { flexDirection: 'row', gap: 10, marginTop: 12 },
   macroGridItem: {
-    flex: 1, alignItems: 'center', backgroundColor: '#F9FAFB',
+    flex: 1, alignItems: 'center', backgroundColor: C.subtle,
     borderRadius: 12, paddingVertical: 10,
   },
   macroGridVal:   { fontSize: 16, fontWeight: '900' },
@@ -407,7 +399,7 @@ const s = StyleSheet.create({
 
   microGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
   microGridItem: {
-    width: '31%', alignItems: 'center', backgroundColor: '#F9FAFB',
+    width: '31%', alignItems: 'center', backgroundColor: C.subtle,
     borderRadius: 12, paddingVertical: 10,
   },
   microGridVal:   { fontSize: 14, fontWeight: '800', color: C.textPrimary },
@@ -426,10 +418,10 @@ const s = StyleSheet.create({
 
   /* 總體進步 */
   cardTitle: { fontSize: 15, fontWeight: '800', color: C.textPrimary },
-  divider:   { height: 1, backgroundColor: '#E5E7EB', marginVertical: 12 },
+  divider:   { height: 1, backgroundColor: C.border, marginVertical: 12 },
   overallRow: { flexDirection: 'row', gap: 10 },
   overallBox: {
-    flex: 1, backgroundColor: '#F9FAFB', borderRadius: 12,
+    flex: 1, backgroundColor: C.subtle, borderRadius: 12,
     paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center',
   },
   overallValue: { fontSize: 17, fontWeight: '900', color: C.textPrimary },
@@ -442,7 +434,7 @@ const s = StyleSheet.create({
   avgMacroText: { fontSize: 11, fontWeight: '600', color: C.textSecondary, marginTop: 4 },
   adherenceBox:   { alignItems: 'flex-end' },
   adherenceValue: { fontSize: 24, fontWeight: '900', color: C.primaryDark },
-  adherenceBarBg:   { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, marginTop: 10 },
+  adherenceBarBg:   { height: 8, backgroundColor: C.muted, borderRadius: 4, marginTop: 10 },
   adherenceBarFill: { height: 8, borderRadius: 4, backgroundColor: C.primary },
   adherenceHint:    { fontSize: 10, color: C.textSecondary, marginTop: 5 },
 
@@ -458,7 +450,7 @@ const s = StyleSheet.create({
   weightDelta: { fontSize: 14, fontWeight: '900' },
 
   trackRow:   { flexDirection: 'row', gap: 10 },
-  trackBox:   { flex: 1, backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12 },
+  trackBox:   { flex: 1, backgroundColor: C.subtle, borderRadius: 12, padding: 12 },
   trackLabel: { fontSize: 11, fontWeight: '700', color: C.textSecondary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
   trackValue: { fontSize: 18, fontWeight: '800', color: C.textPrimary },
   trackUnit:  { fontSize: 12, fontWeight: '600', color: C.textSecondary },
