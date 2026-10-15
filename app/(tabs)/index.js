@@ -9,6 +9,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
 import { catchUpPlan } from '../../constants/bodyCalc';
+import { useAddFood } from '../../components/AddFoodSheet';
 import { useTheme, useStyles } from '../../context/PreferencesContext';
 
 
@@ -189,7 +190,7 @@ export default function DiaryScreen() {
   const [selActivity, setSelActivity] = useState('sedentary');
   const [showCalModal, setShowCalModal] = useState(false);
   const [calYM, setCalYM] = useState({ y: new Date().getFullYear(), m: new Date().getMonth() });
-  const [addTarget, setAddTarget] = useState(null); // 正在為哪個餐次加食物（null = 關閉）
+  const { open: openAddFood } = useAddFood(); // 新增食物選單（跟底部導覽列的相機鈕共用）
   const [openTypes, setOpenTypes] = useState({}); // 哪些餐次卡片是展開的
 
   // 長按食物紀錄後拖到另一個餐次：放開時手指落在哪張餐次卡片上，就移到那個餐次（只在同一天內移動）
@@ -516,7 +517,7 @@ export default function DiaryScreen() {
             t={t}
             open={!!openTypes[type]}
             onToggle={() => toggleOpen(type)}
-            onAdd={() => setAddTarget(type)}
+            onAdd={() => openAddFood(type)}
             onRemove={(time) => removeMeal(selectedKey, time)}
             cardRef={el => { cardRefs.current[type] = el; }}
             isDropTarget={!!drag && drag.overType === type && type !== drag.fromType}
@@ -525,19 +526,6 @@ export default function DiaryScreen() {
             onPressOut={onRowPressOut}
           />
         ))}
-
-        {/* 不先選餐次的快速新增：跟餐次的 + 一樣打開新增食物選單，AI 分析完再選要記到早餐、午餐、晚餐或點心 */}
-        <View style={s.quickAddRow}>
-          <TouchableOpacity
-            style={s.quickAddBtn}
-            onPress={() => setAddTarget('')}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t.addFoodTitle}
-          >
-            <Ionicons name="camera-outline" size={24} color={C.primaryDark} />
-          </TouchableOpacity>
-        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -551,71 +539,6 @@ export default function DiaryScreen() {
         </Animated.View>
       )}
       </View>
-
-      {/* 新增食物 Modal：拍照辨識 */}
-      {addTarget != null && (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setAddTarget(null)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setAddTarget(null)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={s.addModalCard}>
-            <Text style={s.modalTitle}>
-              {addTarget ? `${t[addTarget]}・` : ''}{t.addFoodTitle}
-            </Text>
-
-            <TouchableOpacity
-              style={s.scanBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                const type = addTarget;
-                setAddTarget(null);
-                router.push({ pathname: '/camera', params: { mealType: type } });
-              }}
-            >
-              <Ionicons name="camera" size={20} color={C.onPrimary} />
-              <Text style={s.scanBtnText}>{t.scanFoodOption}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={s.uploadBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                const type = addTarget;
-                setAddTarget(null);
-                router.push({ pathname: '/camera', params: { mealType: type, autoPick: '1' } });
-              }}
-            >
-              <Ionicons name="cloud-upload-outline" size={20} color={C.primaryDark} />
-              <Text style={s.uploadBtnText}>{t.uploadImage}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={s.uploadBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                const type = addTarget;
-                setAddTarget(null);
-                router.push({ pathname: '/camera', params: { mealType: type, manual: '1' } });
-              }}
-            >
-              <Ionicons name="create-outline" size={20} color={C.primaryDark} />
-              <Text style={s.uploadBtnText}>{t.manualTextOption}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={s.uploadBtn}
-              activeOpacity={0.85}
-              onPress={() => {
-                const type = addTarget;
-                setAddTarget(null);
-                router.push({ pathname: '/barcode', params: { mealType: type } });
-              }}
-            >
-              <Ionicons name="barcode-outline" size={20} color={C.primaryDark} />
-              <Text style={s.uploadBtnText}>{t.barcodeScanOption}</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-      )}
 
       {/* 月曆選擇器 Modal */}
       <Modal visible={showCalModal} transparent animationType="slide" onRequestClose={() => setShowCalModal(false)}>
@@ -944,29 +867,6 @@ const makeStyles = (C) => StyleSheet.create({
   mealItemKcal: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
   noMeals: { fontSize: 12, color: C.textSecondary, fontStyle: 'italic', marginTop: 10, textAlign: 'center' },
 
-  /* 新增食物 Modal */
-  addModalCard: {
-    width: '100%', maxHeight: '80%', backgroundColor: C.card,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20,
-  },
-  quickAddRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
-  quickAddBtn: {
-    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: C.card, borderWidth: 1.5, borderColor: C.primary,
-  },
-  scanBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: C.primaryDark, borderRadius: 16, paddingVertical: 15, marginBottom: 18,
-  },
-  scanBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
-  uploadBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: C.tint, borderRadius: 16, borderWidth: 1.5, borderColor: C.primary,
-    paddingVertical: 14, marginTop: 10,
-  },
-  uploadBtnText: { color: C.primaryDark, fontSize: 15, fontWeight: '800' },
-
-  /* 調整目標 Modal */
   modalOverlay: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },
   goalModalCard: {
     width: '100%', maxHeight: '85%', backgroundColor: C.card,
