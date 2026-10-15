@@ -9,8 +9,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey } from '../../context/UserDataContext';
-import { recalcProfile, ageFromBirthday } from '../../constants/bodyCalc';
-import { BirthdaySheet, HeightSheet, WeightSheet, TimelineSheet } from '../../components/ProfileWheels';
+import { recalcProfile, ageFromBirthday, planStatusOf } from '../../constants/bodyCalc';
+import { formatPlanDate } from '../../components/GoalPlanSummary';
+import { BirthdaySheet, HeightSheet, WeightSheet } from '../../components/ProfileWheels';
 import translations, { LANG_KEYS } from '../../constants/translations';
 import { usePreferences, useStyles, NOTIFY_TYPES } from '../../context/PreferencesContext';
 import {
@@ -136,10 +137,8 @@ export default function ProfileScreen() {
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [showGenderSheet, setShowGenderSheet] = useState(false);
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
-  const [showGoalWeightModal, setShowGoalWeightModal] = useState(false);
   const [showHeightSheet, setShowHeightSheet] = useState(false);
   const [showWeightSheet, setShowWeightSheet] = useState(false);
-  const [showTimelineSheet, setShowTimelineSheet] = useState(false);
 
   // 只改單一欄位（性別、生日、目標體重）：整份重算 BMR / TDEE / Goal / 目標熱量，但不算一次量體重
   const patchProfile = (patch) => updateProfile(recalcProfile({ ...profile, ...patch }), { weighedIn: false });
@@ -300,6 +299,7 @@ export default function ProfileScreen() {
 
   const bmi = profile.weight / Math.pow(profile.height / 100, 2);
   const bmiData = bmiInfo(bmi, t, C);
+  const goalLabelOf = g => (g === 'cut' ? t.goalFat : g === 'bulk' ? t.goalMuscle : t.goalMaintain);
   const appearanceLabel = { light: t.appearanceLight, dark: t.appearanceDark, system: t.appearanceSystem }[appearance];
   const unitsLabel = units === 'imperial' ? t.unitsImperialShort : t.unitsMetricShort;
   const genderLabel = (profile.gender === 'male' ? t.male : profile.gender === 'female' ? t.female : t.genderOther)?.replace(/^[^\s]+\s/, '');
@@ -347,18 +347,33 @@ export default function ProfileScreen() {
             />
             <SettingRow icon="resize-outline"  label={t.height} value={formatHeight(profile.height, units)} onPress={() => setShowHeightSheet(true)} />
             <SettingRow icon="scale-outline"   label={t.weight} value={formatWeight(profile.weight, units)} onPress={() => setShowWeightSheet(true)} />
-            <SettingRow
-              icon="flag-outline"
-              label={t.goalWeight}
-              value={profile.targetWeight != null ? formatWeight(profile.targetWeight, units) : t.notSet}
-              onPress={() => setShowGoalWeightModal(true)}
-            />
-            <SettingRow
-              icon="hourglass-outline"
-              label={t.goalTimeline}
-              value={profile.goalMonths ? `${profile.goalMonths} ${t.obMonthsUnit}` : t.notSet}
-              onPress={() => setShowTimelineSheet(true)}
-            />
+            {/* Goal plan：目標、目標體重、目標日期都在 /goal 一起改，存檔前會檢查是否安全可行 */}
+            <SettingRow icon="flag-outline" label={t.goalTypeLabel} value={goalLabelOf(profile.goal)} onPress={() => router.push('/goal')} />
+            {profile.goal !== 'maintain' && (
+              <>
+                <SettingRow
+                  icon="trophy-outline"
+                  label={t.goalWeight}
+                  value={profile.targetWeight != null ? formatWeight(profile.targetWeight, units) : t.notSet}
+                  onPress={() => router.push('/goal')}
+                />
+                <SettingRow
+                  icon="hourglass-outline"
+                  label={t.goalTargetDate}
+                  value={profile.goalDate ? formatPlanDate(profile.goalDate, lang) : t.notSet}
+                  onPress={() => router.push('/goal')}
+                />
+              </>
+            )}
+            {planStatusOf(profile).planStatus === 'needs_review' && (
+              <TouchableOpacity style={s.reviewBanner} onPress={() => router.push('/goal')} activeOpacity={0.85} accessibilityRole="button">
+                <Ionicons name="alert-circle" size={18} color={C.warn} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.reviewTitle}>{t.goalReviewTitle}</Text>
+                  <Text style={s.reviewBody}>{t.goalReviewBody}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
             <SettingRow icon="walk-outline"    label={t.activityLevel} value={t.activities?.find(a => a.key === profile.activity)?.label} onPress={openEditModal} />
             <SettingRow icon="calculator-outline" label="BMI" value={`${bmi.toFixed(1)}・${bmiData.label}`} valueColor={bmiData.color} isLast />
           </View>
@@ -483,15 +498,6 @@ export default function ProfileScreen() {
         />
       )}
 
-      {showGoalWeightModal && (
-        <WeightSheet
-          title={t.goalWeight} t={t} units={units}
-          initialKg={profile.targetWeight ?? profile.weight}
-          onClose={() => setShowGoalWeightModal(false)}
-          onSave={kg => { patchProfile({ targetWeight: kg }); setShowGoalWeightModal(false); }}
-        />
-      )}
-
       {showHeightSheet && (
         <HeightSheet
           t={t} units={units}
@@ -508,15 +514,6 @@ export default function ProfileScreen() {
           initialKg={profile.weight}
           onClose={() => setShowWeightSheet(false)}
           onSave={kg => { updateProfile(recalcProfile({ ...profile, weight: kg })); setShowWeightSheet(false); }}
-        />
-      )}
-
-      {showTimelineSheet && (
-        <TimelineSheet
-          t={t}
-          initialMonths={profile.goalMonths}
-          onClose={() => setShowTimelineSheet(false)}
-          onSave={months => { patchProfile({ goalMonths: months }); setShowTimelineSheet(false); }}
         />
       )}
 
@@ -1029,6 +1026,14 @@ const makeStyles = (C) => StyleSheet.create({
   },
   sheetOptionActive: { borderColor: C.primary, backgroundColor: C.tint },
   sheetOptionText: { flex: 1, fontSize: 17, fontWeight: '700', color: C.textPrimary },
+
+  /* Goal plan 需要重看 */
+  reviewBanner: {
+    flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginTop: 8, marginBottom: 4,
+    padding: 12, borderRadius: 12, backgroundColor: C.warnSoft, borderWidth: 1, borderColor: C.warn,
+  },
+  reviewTitle: { fontSize: 13, fontWeight: '800', color: C.textPrimary },
+  reviewBody: { fontSize: 12, color: C.textSecondary, marginTop: 3, lineHeight: 17 },
 
   /* Notifications Modal */
   notifyRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 },

@@ -75,22 +75,22 @@ The weight the app expects from the user's logged intake since their last weigh-
 The suggestion shown after a Day over its Target: eat a little less (at most 400 kcal a day, never below 1,200 kcal) over the next few Days. It is advice only and does not change the Target.
 
 **Goal**:
-The direction the user is working towards: lose fat, build muscle, or maintain weight. Decided by comparing the Goal weight with the current weight (within 0.3 kg counts as maintain).
+The direction the user is working towards: lose fat, build muscle, or maintain weight. The user chooses it in the Goal plan; onboarding suggests it by comparing the Goal weight with the current weight (within 0.3 kg counts as maintain).
 _Avoid_: Target, 目標 (on its own)
 
 **Goal weight**:
-The weight the user wants to reach, first asked in onboarding and changeable in the Profile. It sets the Goal.
+The weight the user wants to reach, first asked in onboarding and changed in the Goal plan. It must be below the current weight to lose fat and above it to build muscle; maintaining ignores it.
 _Avoid_: Target weight (in conversation), ideal weight
 
-**Goal timeline**:
-How many months the user gives themselves to reach the Goal weight, first asked in onboarding and changeable in the Profile.
-_Avoid_: Deadline, duration
+**Goal plan**:
+A Goal, a Goal weight and a target date (the date the user aims to reach the Goal weight by), set in onboarding and on the Goal plan screen. A plan is only saved when it passes validation, in the app and again on the server: a sensible direction and date, at most 1% of body weight a week when losing fat and 0.25% when building muscle, daily calories never below the minimum for the user's sex (1,200 female, 1,500 male, 1,350 not stated), a surplus of at most 500 kcal, and no weight change plans under 18. These are product defaults, not medical rules. A rejected plan comes with a longer target date that does pass, when one exists. A saved plan that later stops passing (the weight moved, time ran short, or the Goal weight was reached) **needs review**: the app asks the user to update it and meanwhile uses the largest safe Goal change.
+_Avoid_: Goal timeline (months), deadline
 
 **Goal change**:
-The daily kcal added to or taken from TDEE for the Goal: the kg still to go × 7,700 kcal, spread evenly over every day of the Goal timeline, worked out from the current weight each time. Kept within safe limits: at most 1,000 kcal less a day and no more than 25% of TDEE when losing fat, at most 500 kcal more when building muscle. Without a Goal weight or Goal timeline it is a fixed −400 (lose fat) or +300 (build muscle); maintaining is 0.
+The daily kcal added to or taken from TDEE for the Goal: the kg still to go × 7,700 kcal divided by the days left until the target date. It is a rough estimate, not a promise. Without a Goal weight or target date it is a fixed −400 (lose fat) or +300 (build muscle) within the same limits; maintaining is 0.
 
 **Target**:
-The user's daily calorie goal in kcal: TDEE plus the Goal change plus any Adaptive adjustment, never below 1,200 kcal. It is not set by hand. Each Day keeps the Target that applied on that Day, so changing it later does not rewrite past Days.
+The user's daily calorie goal in kcal: TDEE plus the Goal change plus any Adaptive adjustment. The server works it out itself; the app never sends one that is trusted. It is not set by hand. Each Day keeps the Target that applied on that Day, so changing it later does not rewrite past Days.
 _Avoid_: Goal, calorie budget
 
 **Weight trend**:
@@ -98,7 +98,7 @@ The user's weight judged by a 7-day average (the mean of every weigh-in in the s
 _Avoid_: Daily weight change
 
 **Adaptive adjustment**:
-A small, automatic change to the Target once there are at least two weeks of fully logged Days and weigh-ins at least two weeks apart within the last four weeks. The app estimates the user's real TDEE from average intake and the Weight trend, then moves the Target towards it by at most 100 kcal, at most once every two weeks and at most 400 kcal in total. Unlike a Catch-up, it does change the Target.
+A small, automatic change to the Target once there are at least two weeks of fully logged Days and weigh-ins at least two weeks apart within the last four weeks. The app estimates the user's real TDEE from average intake and the Weight trend, then moves the Target towards it by at most 100 kcal, at most once every two weeks and at most 400 kcal in total. It never takes the Target below the calorie minimum. Unlike a Catch-up, it does change the Target.
 _Avoid_: Auto target, recalibration
 
 ## Plans and limits

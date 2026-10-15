@@ -6,7 +6,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
 import { useUserData, dateKey } from '../context/UserDataContext';
-import { recalcProfile } from '../constants/bodyCalc';
+import { recalcProfile, goalFromWeights, calcBmr, activityFactor } from '../constants/bodyCalc';
+import { validateGoal, goalInputFromProfile, addDays } from '../constants/goalPlan';
+import GoalPlanSummary from '../components/GoalPlanSummary';
 import { usePreferences, useStyles } from '../context/PreferencesContext';
 import {
   weightToDisplay, weightFromDisplay, weightUnitLabel, formatWeight,
@@ -16,10 +18,10 @@ import {
 const ACTIVITY_EMOJI = { sedentary: '🧘', lightly: '🚶', moderately: '🏃', very: '🏋️', extra: '🥊' };
 // labelKey 對應 translations 裡的字串，顯示時才依目前語言取值
 const DURATIONS = [
-  { key: '4',  labelKey: 'obDur1m' },
-  { key: '12', labelKey: 'obDur3m' },
-  { key: '24', labelKey: 'obDur6m' },
-  { key: '52', labelKey: 'obDur1y' },
+  { key: '30',  labelKey: 'obDur1m' },  // key = 天數
+  { key: '91',  labelKey: 'obDur3m' },
+  { key: '182', labelKey: 'obDur6m' },
+  { key: '365', labelKey: 'obDur1y' },
 ];
 const TOTAL_STEPS = 8;
 const BUILD_MS = 2200;
@@ -28,7 +30,7 @@ const BUILD_MS = 2200;
 // 完成後直接呼叫跟「編輯個人資料」同一套 updateProfile()，所以後續在個人頁改資料用的是同一份計算邏輯。
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const { updateProfile } = useUserData();
   const { C, units, setUnits } = usePreferences();
   const s = useStyles(makeStyles);
@@ -40,7 +42,7 @@ export default function OnboardingScreen() {
   const [height, setHeight] = useState(165);
   const [weight, setWeight] = useState(60);
   const [targetWeight, setTargetWeight] = useState(60);
-  const [durationKey, setDurationKey] = useState('12');
+  const [durationKey, setDurationKey] = useState('91');
   const [customMonths, setCustomMonths] = useState('3');
   const [activity, setActivity] = useState('sedentary');
   const [result, setResult] = useState(null);
@@ -65,21 +67,32 @@ export default function OnboardingScreen() {
   const next = () => setStep(s => Math.min(s + 1, TOTAL_STEPS - 1));
   const back = () => setStep(s => Math.max(s - 1, 0));
 
-  const durationWeeks = durationKey === 'other'
-    ? Math.max(1, (parseFloat(customMonths) || 0) * 4)
+  // 最後一步（時程）：Goal 依目標體重判斷，時程換成目標日期，用 constants/goalPlan.js 的 validateGoal 檢查。
+  // 活動量在前一步已經選好，TDEE 才算得出來
+  const today = dateKey();
+  const timelineDays = durationKey === 'other'
+    ? Math.ceil((parseFloat(customMonths) || 0) * 30.44)
     : parseInt(durationKey, 10);
+  const planGoal = goalFromWeights(weight, targetWeight) ?? 'maintain';
+  const draft = {
+    age, ageSetAt: today, gender, height: roundCm(height), weight: roundKg(weight),
+    targetWeight: roundKg(targetWeight), activity, goal: planGoal,
+    goalDate: planGoal === 'maintain' || !(timelineDays > 0) ? null : addDays(today, timelineDays),
+  };
+  const tdee = calcBmr(gender, draft.weight, draft.height, age) * activityFactor(activity);
+  const validation = validateGoal(goalInputFromProfile({ ...draft, tdee }, today));
+  const isLastStep = step === TOTAL_STEPS - 1;
 
-  // 按最後一步的「完成」：先算好結果，進入建立動畫，動畫跑完才真的存檔放行
+  // 建議的時程換成「其他 N 個月」（取到半個月，一定不短於建議的天數），再交給驗證重算
+  const applySuggestion = (sug) => {
+    setDurationKey('other');
+    setCustomMonths(String(Math.ceil((sug.days / 30.44) * 2) / 2));
+  };
+
+  // 按最後一步的「完成」：先算好結果，進入建立動畫，動畫跑完才真的存檔放行。計畫沒通過驗證就不能按
   const startBuilding = () => {
-    // 目標體重也存起來（個人頁顯示、之後判斷 Goal 用）；Goal 和目標熱量由 recalcProfile 依目標體重算
-    setResult(recalcProfile({
-      age, ageSetAt: dateKey(), gender, height: roundCm(height), weight: roundKg(weight),
-      targetWeight: roundKg(targetWeight), activity,
-      // 目標時程存成月數（個人頁的 Goal timeline 用）
-      goalMonths: durationKey === 'other'
-        ? Math.max(1, Math.round(parseFloat(customMonths) || 1))
-        : { 4: 1, 12: 3, 24: 6, 52: 12 }[durationKey],
-    }));
+    if (!validation.allowed) return;
+    setResult(recalcProfile(draft, today));
     setPhase('building');
   };
 
@@ -95,7 +108,6 @@ export default function OnboardingScreen() {
     : { label: t.obBmiObese, color: C.required };
 
   const weightDiff = targetWeight - weight;
-  const weeklyRate = Math.abs(weightDiff) / (durationWeeks / 4);
 
   if (phase === 'building' || phase === 'done') {
     return <BuildingScreen phase={phase} onBuilt={() => setPhase('done')} result={result} onContinue={finish} />;
@@ -211,10 +223,11 @@ export default function OnboardingScreen() {
           </>
         )}
 
-        {step === 6 && (
+        {step === 7 && (
           <>
             <Text style={s.title}>{t.obDurationTitle}</Text>
             <Text style={s.subtitle}>{t.obDurationSub}</Text>
+            {planGoal === 'maintain' ? <Text style={s.subtitle}>{t.goalNoTimeline}</Text> : (
             <View style={s.durationGrid}>
               {DURATIONS.map(d => (
                 <TouchableOpacity
@@ -234,8 +247,9 @@ export default function OnboardingScreen() {
                 <Text style={[s.durationChipText, durationKey === 'other' && s.durationChipTextActive]}>{t.obDurOther}</Text>
               </TouchableOpacity>
             </View>
+            )}
 
-            {durationKey === 'other' && (
+            {planGoal !== 'maintain' && durationKey === 'other' && (
               <View style={s.customDurationRow}>
                 <TextInput
                   style={s.customDurationInput}
@@ -249,17 +263,18 @@ export default function OnboardingScreen() {
               </View>
             )}
 
-            {Math.abs(weightDiff) >= 0.3 && (
-              <View style={s.feedbackCard}>
-                <Text style={s.feedbackText}>
-                  {(weightDiff > 0 ? t.obMonthlyGain : t.obMonthlyLose).replace('{n}', formatWeight(weeklyRate, units))}
-                </Text>
-              </View>
-            )}
+            <GoalPlanSummary
+              validation={validation}
+              goalType={planGoal}
+              weightKg={draft.weight}
+              t={t}
+              lang={lang}
+              onApplySuggestion={applySuggestion}
+            />
           </>
         )}
 
-        {step === 7 && (
+        {step === 6 && (
           <>
             <Text style={s.title}>{t.obActivityTitle}</Text>
             <Text style={s.subtitle}>{t.obActivitySub}</Text>
@@ -286,8 +301,15 @@ export default function OnboardingScreen() {
       </ScrollView>
 
       <View style={s.footer}>
-        <TouchableOpacity style={s.btn} onPress={step === TOTAL_STEPS - 1 ? startBuilding : next} activeOpacity={0.85}>
-          <Text style={s.btnText}>{step === TOTAL_STEPS - 1 ? t.obFinish : t.obContinue}</Text>
+        <TouchableOpacity
+          style={[s.btn, isLastStep && !validation.allowed && s.btnDisabled]}
+          onPress={isLastStep ? startBuilding : next}
+          disabled={isLastStep && !validation.allowed}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isLastStep && !validation.allowed }}
+        >
+          <Text style={s.btnText}>{isLastStep ? t.obFinish : t.obContinue}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -483,6 +505,7 @@ const makeStyles = (C) => StyleSheet.create({
   footer: { paddingHorizontal: 28, paddingBottom: 24, paddingTop: 8 },
   btn: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', backgroundColor: C.primary },
   btnText: { fontSize: 16, fontWeight: '800', color: C.onPrimary },
+  btnDisabled: { backgroundColor: C.borderStrong },
 
   buildWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   buildPercent: { fontSize: 56, fontWeight: '900', color: C.primaryDark, marginBottom: 20 },

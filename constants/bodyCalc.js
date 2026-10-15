@@ -1,97 +1,55 @@
-// 身體數據的計算：onboarding、個人資料編輯、每年自動更新年齡都走這裡，確保同一套公式
+// 身體數據的計算：onboarding、個人資料編輯、每年自動更新年齡都走這裡，確保同一套公式。
+// BMR、TDEE、Goal plan 的驗證和熱量 / 營養素目標在 constants/goalPlan.js（跟後端共用同一份），這裡只是轉接
+import {
+  GOAL_POLICY, calcBmr, activityFactor, daysBetween, addDays,
+  resolveDailyTarget, calculateMacroTargets, calorieMinimum,
+} from './goalPlan';
+
+export { calcBmr, activityFactor, daysBetween };
 
 // 'other' = 其他 / 不願透露。公式本身只分男女，選 other 時取兩條公式的平均，誤差會比選男/女大一點
 export const GENDER_KEYS = ['male', 'female', 'other'];
 
-const ACTIVITY_FACTORS = { sedentary: 1.2, lightly: 1.375, moderately: 1.55, very: 1.725, extra: 1.9 };
-
-// 沒有目標體重或目標時程時，目標模式對 TDEE 的固定增減
-export const GOAL_DELTAS = { bulk: 300, cut: -400, maintain: 0 };
-// 依時程算出來的每日增減，夾在安全範圍內：
-// 減脂每天最多少 1000 kcal，也不超過 TDEE 的 25%；增肌每天最多多 500 kcal（再多長的多半是脂肪）
-export const GOAL_LIMITS = { maxDeficit: 1000, maxDeficitShare: 0.25, maxSurplus: 500 };
-const DAYS_PER_MONTH = 30.44;
-const KCAL_PER_KG = 7700;
-// 目標熱量的安全下限：再怎麼減脂、再怎麼動態調整，都不建議每天低於這個數字
-export const MIN_TARGET = 1200;
-
-// Harris-Benedict 公式
-export function calcBmr(gender, weight, height, age) {
-  const male   = 88.362 + 13.397 * weight + 4.799 * height - 5.677 * age;
-  const female = 447.593 + 9.247 * weight + 3.098 * height - 4.330 * age;
-  if (gender === 'male') return male;
-  if (gender === 'female') return female;
-  return (male + female) / 2;
+// 今天（裝置當地日期，GLOSSARY「Day」）
+export function todayKey() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function activityFactor(activity) {
-  return ACTIVITY_FACTORS[activity] ?? 1.2;
-}
-
-// ── Goal-based Nutrition Engine ─────────────────────────────────────
-// Goal 由目標體重決定：比目前重 → 增肌、比目前輕 → 減脂、差不到 0.3 kg → 維持
+// 問卷用：目標體重比目前重 → 增肌、比目前輕 → 減脂、差不到 0.3 kg → 維持。之後在 Goal plan 頁可以自己選
 export function goalFromWeights(weight, targetWeight) {
   if (weight == null || targetWeight == null) return null;
-  return targetWeight > weight + 0.3 ? 'bulk' : targetWeight < weight - 0.3 ? 'cut' : 'maintain';
+  const tol = GOAL_POLICY.maintainToleranceKg;
+  return targetWeight > weight + tol ? 'bulk' : targetWeight < weight - tol ? 'cut' : 'maintain';
 }
 
-// Goal 的每日熱量增減（Goal change，見 GLOSSARY）：
-// 有目標體重和目標時程 → (目標體重 − 體重) × 7700 kcal 平均分到時程的每一天，再夾進安全範圍；
-// 每次重算都用「現在的體重」和整段時程，越接近目標體重，增減就越小。
-// 缺任一項（舊資料）就退回 GOAL_DELTAS 的固定值。維持期一律 0
-export function goalDelta(p) {
-  if (!p || p.goal === 'maintain') return 0;
-  if (p.targetWeight == null || !(p.goalMonths > 0) || p.weight == null) return GOAL_DELTAS[p.goal] ?? 0;
-  const daily = ((p.targetWeight - p.weight) * KCAL_PER_KG) / (p.goalMonths * DAYS_PER_MONTH);
-  if (daily < 0) {
-    const maxDeficit = Math.min(GOAL_LIMITS.maxDeficit, (p.tdee ?? Infinity) * GOAL_LIMITS.maxDeficitShare);
-    return Math.max(-maxDeficit, daily);
-  }
-  return Math.min(GOAL_LIMITS.maxSurplus, daily);
-}
-// 有沒有被安全範圍擋下（時程太短）：資訊面板用來提醒
-export function goalDeltaCapped(p) {
-  if (!p || p.goal === 'maintain' || p.targetWeight == null || !(p.goalMonths > 0) || p.weight == null) return false;
-  const daily = ((p.targetWeight - p.weight) * KCAL_PER_KG) / (p.goalMonths * DAYS_PER_MONTH);
-  return Math.abs(daily - goalDelta(p)) > 1;
-}
-
-// Target = TDEE + Goal change + Adaptive adjustment（見 GLOSSARY），不低於 MIN_TARGET
-export function targetCalories(p) {
-  return Math.max(MIN_TARGET, p.tdee + goalDelta(p) + (p.targetAdjustment || 0));
-}
-
-// 身體資料改了（性別、生日、身高、體重、目標體重、活動量）就用這支重算整份 profile：
-// BMR → TDEE → Goal（有目標體重才重判）→ Target。動態調整的累計值保留，不因為改資料歸零
-export function recalcProfile(p) {
+// 身體資料或 Goal plan 改了就用這支重算整份 profile：BMR → TDEE → 目標熱量（resolveDailyTarget）。
+// Goal 是使用者選的，這裡不改；動態調整的累計值保留，不因為改資料歸零
+export function recalcProfile(p, today = todayKey()) {
   const bmr = calcBmr(p.gender, p.weight, p.height, p.age);
   const tdee = bmr * activityFactor(p.activity);
-  const goal = goalFromWeights(p.weight, p.targetWeight) ?? (GOAL_DELTAS[p.goal] != null ? p.goal : 'maintain');
+  const goal = ['cut', 'bulk', 'maintain'].includes(p.goal)
+    ? p.goal
+    : goalFromWeights(p.weight, p.targetWeight) ?? 'maintain';
   const next = { ...p, bmr, tdee, goal };
-  return { ...next, target: targetCalories(next) };
+  return { ...next, target: resolveDailyTarget(next, today).target };
 }
 
-// 三大營養素目標依 Goal 調整：蛋白質依體重（減脂 2.0 g/kg 保肌肉、增肌 1.8、維持 1.6），
-// 脂肪佔熱量的固定比例，剩下的給碳水。蛋白質最多佔 35% 熱量，避免體重很重時比例失衡
-const MACRO_RULES = {
-  cut:      { proteinPerKg: 2.0, fatShare: 0.25 },
-  bulk:     { proteinPerKg: 1.8, fatShare: 0.25 },
-  maintain: { proteinPerKg: 1.6, fatShare: 0.30 },
-};
+// 目前 Goal plan 的狀態（'ok' | 'needs_review' | 'no_plan' | 'maintain'）和驗證結果，給畫面顯示用
+export function planStatusOf(profile, today = todayKey()) {
+  if (profile?.tdee == null) return { planStatus: 'no_plan', validation: null, goalChange: 0 };
+  return resolveDailyTarget(profile, today);
+}
+
+// 三大營養素目標（見 goalPlan.js 的 calculateMacroTargets）
 export function macroTargets(target, weightKg, goal) {
   if (target == null) return null;
-  const rule = MACRO_RULES[goal] ?? MACRO_RULES.maintain;
-  const protein = weightKg ? Math.min(rule.proteinPerKg * weightKg, (target * 0.35) / 4) : (target * 0.20) / 4;
-  const fat = (target * rule.fatShare) / 9;
-  const carbs = Math.max(0, (target - protein * 4 - fat * 9) / 4);
-  return { protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat) };
+  return calculateMacroTargets({ calories: target, weightKg, goalType: goal });
 }
-export const MACRO_RULE_FOR = (goal) => MACRO_RULES[goal] ?? MACRO_RULES.maintain;
-
-// ── 日期小工具（Day 是 YYYY-MM-DD）──────────────────────────────────
-const dayNum = (key) => { const [y, m, d] = key.split('-').map(Number); return Date.UTC(y, m - 1, d) / 86400000; };
-export const daysBetween = (fromKey, toKey) => dayNum(toKey) - dayNum(fromKey);
-const addDays = (key, n) => new Date((dayNum(key) + n) * 86400000).toISOString().slice(0, 10);
+export const MACRO_RULE_FOR = (goal) => GOAL_POLICY.macros[goal] ?? GOAL_POLICY.macros.maintain;
+export const KCAL_PER_KG = GOAL_POLICY.kcalPerKg;
+export { calorieMinimum };
 
 // ── Weight trend（見 GLOSSARY）：用 7 日平均體重判斷增減，不看單日數字 ─────────
 // 回傳每次量體重的那天和「那天往前 7 天內所有量測的平均」，依日期排序
@@ -142,7 +100,7 @@ export function adaptiveCheck(profile, dailyLogs, todayKey) {
   const endAvg = trend[trend.length - 1].avg;
   const avgIntake = logged.reduce((sum, d) => sum + d.energy, 0) / logged.length;
   const estimatedTdee = avgIntake - ((endAvg - startAvg) * KCAL_PER_KG) / span;
-  const ideal = estimatedTdee + goalDelta(profile);
+  const ideal = estimatedTdee + resolveDailyTarget({ ...profile, targetAdjustment: 0 }, todayKey).goalChange;
   return { ready: true, ...status, startAvg, endAvg, avgIntake, estimatedTdee, ideal };
 }
 
@@ -160,17 +118,24 @@ export function adaptedProfile(profile, dailyLogs, todayKey) {
   return {
     ...profile,
     targetAdjustment: current + step,
-    target: targetCalories({ ...profile, targetAdjustment: current + step }),
+    target: resolveDailyTarget({ ...profile, targetAdjustment: current + step }, todayKey).target,
     targetAdjustedAt: todayKey,
     lastAdjustment: step,
   };
 }
 
-// 存著的 Goal / 目標熱量跟公式算出來的不一樣（例如公式更新了、舊資料還沒重算）就回傳重算後的 profile，一樣就回傳 null
-export function refreshedProfile(profile) {
+// 存著的目標熱量跟公式算出來的不一樣（公式更新了、舊資料還沒重算、時間經過讓 Goal plan 需要重看）
+// 就回傳重算後的 profile，一樣就回傳 null。
+// 舊版存的是 goalMonths（幾個月），換成目標日期 goalDate：從今天起算那麼多個月
+export function refreshedProfile(profile, today = todayKey()) {
   if (profile?.height == null || profile.weight == null || profile.age == null) return null;
-  const next = recalcProfile(profile);
-  return next.goal !== profile.goal || Math.abs(next.target - (profile.target ?? 0)) > 1 ? next : null;
+  let p = profile;
+  if (p.goalMonths > 0 && !p.goalDate) {
+    const { goalMonths: _m, ...rest } = p;
+    p = { ...rest, goalDate: addDays(today, Math.round(p.goalMonths * 30.44)) };
+  }
+  const next = recalcProfile(p, today);
+  return p !== profile || next.goal !== profile.goal || Math.abs(next.target - (profile.target ?? 0)) > 1 ? next : null;
 }
 
 // ── 生日 → 年齡 ──────────────────────────────────────────────────────
@@ -206,9 +171,10 @@ export function agedProfile(profile, todayKey) {
 // 每天最多少 400 kcal，而且調整後不低於 1200 kcal；最多分 7 天。
 // （不用 BMR 當下限：久坐的人選減脂時，目標本來就常常低於 BMR，用 BMR 會變成幾乎永遠「不建議少吃」）
 // 多吃不到 100 kcal 不值得調整，回傳 null；目標已經貼近下限、沒空間少吃時 perDay 是 0（改建議多活動）
+const CATCH_UP_FLOOR = 1200;
 export function catchUpPlan(surplus, target) {
   if (!(surplus >= 100) || target == null) return null;
-  const room = Math.min(400, target - MIN_TARGET);
+  const room = Math.min(400, target - CATCH_UP_FLOOR);
   if (room < 50) return { surplus: Math.round(surplus), days: 0, perDay: 0, adjusted: Math.round(target) };
   const days = Math.min(7, Math.ceil(surplus / room));
   const perDay = Math.min(room, Math.round(surplus / days / 10) * 10);

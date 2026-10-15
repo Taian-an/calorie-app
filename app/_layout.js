@@ -24,6 +24,7 @@ function RootNavigator() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="entry" />
           <Stack.Screen name="entry-nutrition" />
+          <Stack.Screen name="goal" />
         </Stack.Protected>
         <Stack.Protected guard={!!authEmail && !onboarded}>
           <Stack.Screen name="onboarding" />

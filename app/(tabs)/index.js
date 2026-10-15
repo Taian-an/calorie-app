@@ -8,7 +8,11 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
-import { catchUpPlan, macroTargets as goalMacroTargets, adaptiveCheck, MACRO_RULE_FOR, goalDelta as goalDeltaOf, goalDeltaCapped, MIN_TARGET, ADAPT } from '../../constants/bodyCalc';
+import { catchUpPlan, macroTargets as goalMacroTargets, adaptiveCheck, MACRO_RULE_FOR, planStatusOf, calorieMinimum, ADAPT } from '../../constants/bodyCalc';
+import { daysBetween } from '../../constants/goalPlan';
+import { formatPlanDate } from '../../components/GoalPlanSummary';
+import { usePreferences } from '../../context/PreferencesContext';
+import { formatWeight } from '../../constants/units';
 import { entryPhotoUri } from '../../constants/nutrition';
 import { useAddFood } from '../../components/AddFoodSheet';
 import { useTheme, useStyles } from '../../context/PreferencesContext';
@@ -179,19 +183,23 @@ function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, on
 
 // 每日目標怎麼來：BMR → TDEE → Goal 增減 → 動態調整 → 目標，帶入使用者自己的數字。
 // 動態調整還沒開始的話，顯示還差多少資料
-function TargetInfoModal({ profile, dailyLogs, t, onClose }) {
+function TargetInfoModal({ profile, dailyLogs, t, lang, onClose }) {
   const s = useStyles(makeStyles);
   const n = v => Math.round(v).toLocaleString();
   const signed = v => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${n(Math.abs(v))}`;
   const activity = t.activities.find(a => a.key === profile.activity);
-  const goalDelta = goalDeltaOf(profile);
-  const timelineSub = profile.goal === 'maintain'
+  const { units } = usePreferences();
+  const today = dateKey();
+  const { goalChange: goalDelta, planStatus } = planStatusOf(profile, today);
+  const timelineSub = planStatus === 'maintain'
     ? t.targetInfoGoalMaintain
-    : profile.targetWeight != null && profile.goalMonths > 0
-      ? (goalDeltaCapped(profile) ? t.targetInfoGoalCapped : t.targetInfoGoalTimeline)
-        .replace('{kg}', Math.abs(Math.round((profile.targetWeight - profile.weight) * 10) / 10))
-        .replace('{m}', profile.goalMonths)
-      : t.targetInfoGoalSub;
+    : planStatus === 'ok'
+      ? t.targetInfoGoalPlan
+        .replace('{kg}', formatWeight(Math.abs(profile.targetWeight - profile.weight), units))
+        .replace('{date}', formatPlanDate(profile.goalDate, lang))
+        .replace('{w}', Math.round((daysBetween(today, profile.goalDate) / 7) * 10) / 10)
+      : planStatus === 'needs_review' ? t.targetInfoGoalReview : t.targetInfoGoalLegacy;
+  const minimum = calorieMinimum(profile.gender) ?? calorieMinimum('other');
   const adjustment = profile.targetAdjustment ?? 0;
   const check = adaptiveCheck(profile, dailyLogs, dateKey());
   const rule = MACRO_RULE_FOR(profile.goal);
@@ -229,7 +237,7 @@ function TargetInfoModal({ profile, dailyLogs, t, onClose }) {
             <View style={[s.infoRow, s.infoTotal]}>
               <View style={{ flex: 1 }}>
                 <Text style={s.infoLabel}>{t.targetInfoTarget}</Text>
-                <Text style={s.infoSub}>{t.targetInfoTargetSub.replace('{min}', MIN_TARGET)}</Text>
+                <Text style={s.infoSub}>{t.targetInfoTargetSub.replace('{min}', minimum)}</Text>
               </View>
               <Text style={s.infoTotalValue}>{n(profile.target)} kcal</Text>
             </View>
@@ -530,6 +538,14 @@ export default function DiaryScreen() {
           )}
         </View>
 
+        {/* Goal plan 超出安全範圍（體重變了、時間快到、已達目標體重）：請使用者重新設定 */}
+        {isToday && profile && planStatusOf(profile).planStatus === 'needs_review' && (
+          <TouchableOpacity style={[s.tipCard, s.tipCardWarn]} onPress={() => router.push('/goal')} activeOpacity={0.85} accessibilityRole="button">
+            <Text style={s.tipTitle}>{t.goalReviewTitle}</Text>
+            <Text style={s.tipBody}>{t.goalReviewBody}</Text>
+          </TouchableOpacity>
+        )}
+
         {/* 目標熱量剛被動態調整過 */}
         {recentAdjustment != null && (
           <TouchableOpacity style={s.tipCard} onPress={() => setShowTargetInfo(true)} activeOpacity={0.85}>
@@ -699,7 +715,7 @@ export default function DiaryScreen() {
 
       {/* 每日目標的計算公式（右上角 info） */}
       {showTargetInfo && profile && (
-        <TargetInfoModal profile={profile} dailyLogs={dailyLogs} t={t} onClose={() => setShowTargetInfo(false)} />
+        <TargetInfoModal profile={profile} dailyLogs={dailyLogs} t={t} lang={lang} onClose={() => setShowTargetInfo(false)} />
       )}
     </SafeAreaView>
   );

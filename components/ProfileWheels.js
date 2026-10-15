@@ -4,16 +4,16 @@ import { ageFromBirthday } from '../constants/bodyCalc';
 import { dateKey } from '../context/UserDataContext';
 import { weightToDisplay, weightFromDisplay, weightUnitLabel, roundCm, roundKg } from '../constants/units';
 
-// 個人頁的滾輪選單：生日、身高、體重、目標體重、目標時程。
+// 個人頁的滾輪選單：生日、身高、體重、目標體重、目標日期。
 // 身高體重依「設定 → 單位」顯示公制或英制，存檔一律換回 cm / kg
 
 const pad = n => String(n).padStart(2, '0');
 const indexOf = (items, value) => Math.max(0, items.findIndex(it => it.value === value));
 
-// 生日：日 / 月 / 年三欄，年份由近到遠（13–100 歲）。換月份或年份時日數不夠就夾到月底
-export function BirthdaySheet({ t, lang, initial, fallbackAge, onSave, onClose }) {
-  const thisYear = new Date().getFullYear();
-  const [y0, m0, d0] = (initial ?? `${thisYear - (fallbackAge || 25)}-01-01`).split('-').map(Number);
+// 日期：日 / 月 / 年三欄。years 是年份清單（生日由近到遠、目標日期由近到遠往後）。
+// 換月份或年份時日數不夠就夾到月底。onSave 拿到 YYYY-MM-DD；validate 回傳 false 時不存
+export function DateSheet({ title, t, lang, initial, years: yearList, validate, onSave, onClose }) {
+  const [y0, m0, d0] = initial.split('-').map(Number);
   const [year, setYear] = useState(y0);
   const [month, setMonth] = useState(m0);
   const [day, setDay] = useState(d0);
@@ -25,18 +25,16 @@ export function BirthdaySheet({ t, lang, initial, fallbackAge, onSave, onClose }
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i + 1, label: new Date(2000, i, 1).toLocaleDateString(locale, { month: 'long' }),
   }));
-  const years = [];
-  for (let y = thisYear - 13; y >= thisYear - 100; y--) years.push({ value: y, label: String(y) });
+  const years = yearList.map(y => ({ value: y, label: String(y) }));
 
   const save = () => {
     const key = `${year}-${pad(month)}-${pad(dayValue)}`;
-    const age = ageFromBirthday(key, dateKey());
-    if (age >= 13 && age <= 100) onSave(key);
+    if (!validate || validate(key)) onSave(key);
   };
 
   return (
     <WheelSheet
-      title={t.birthday}
+      title={title}
       saveLabel={t.saveLabel}
       onClose={onClose}
       onSave={save}
@@ -45,6 +43,35 @@ export function BirthdaySheet({ t, lang, initial, fallbackAge, onSave, onClose }
         { items: months, index: month - 1, onChange: i => setMonth(months[i].value), flex: 1.6 },
         { items: years, index: indexOf(years, year), onChange: i => setYear(years[i].value), flex: 1 },
       ]}
+    />
+  );
+}
+
+// 生日：年份由近到遠（13–100 歲）
+export function BirthdaySheet({ t, lang, initial, fallbackAge, onSave, onClose }) {
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let y = thisYear - 13; y >= thisYear - 100; y--) years.push(y);
+  return (
+    <DateSheet
+      title={t.birthday} t={t} lang={lang}
+      initial={initial ?? `${thisYear - (fallbackAge || 25)}-01-01`}
+      years={years}
+      validate={key => { const age = ageFromBirthday(key, dateKey()); return age >= 13 && age <= 100; }}
+      onSave={onSave} onClose={onClose}
+    />
+  );
+}
+
+// Goal plan 的目標日期：今年起往後 4 年。是否在合理範圍由 validateGoal 判斷並顯示原因，這裡不擋
+export function TargetDateSheet({ t, lang, initial, onSave, onClose }) {
+  const thisYear = new Date().getFullYear();
+  return (
+    <DateSheet
+      title={t.goalTargetDate} t={t} lang={lang}
+      initial={initial}
+      years={[0, 1, 2, 3, 4].map(n => thisYear + n)}
+      onSave={onSave} onClose={onClose}
     />
   );
 }
@@ -112,22 +139,6 @@ export function WeightSheet({ title, t, units, initialKg, onSave, onClose }) {
         { items: wholeItems, index: indexOf(wholeItems, whole), onChange: i => setWhole(wholeItems[i].value), flex: 1.4, align: 'right' },
         { items: tenthItems, index: tenth, onChange: i => setTenth(tenthItems[i].value), flex: 0.8, align: 'left' },
       ]}
-    />
-  );
-}
-
-// 目標時程：1–36 個月
-export function TimelineSheet({ t, initialMonths, onSave, onClose }) {
-  const items = numberItems(1, 36);
-  const [months, setMonths] = useState(Math.min(36, Math.max(1, Math.round(initialMonths || 3))));
-  return (
-    <WheelSheet
-      title={t.goalTimeline}
-      saveLabel={t.saveLabel}
-      onClose={onClose}
-      onSave={() => onSave(months)}
-      suffix={t.obMonthsUnit}
-      columns={[{ items, index: months - 1, onChange: i => setMonths(items[i].value) }]}
     />
   );
 }

@@ -7,6 +7,7 @@ Expo / React Native app (iOS, Android, web) for Calorie Tracks — the main prod
 - Only one Claude conversation edits this repo at a time.
 - Before changing anything, run `git status`. If there are changes you didn't make, stop and ask before touching or committing them.
 - Commit each finished piece of work right away; don't leave uncommitted changes for the next conversation.
+- `constants/goalPlan.js` (Goal plan validation, Target and macros) is shared with the back end: after changing it, copy it to `../server/services/goalPlan.js` and run `npm test` in `server/`, which fails while the copies differ.
 - After adding a package with native code, run `LANG=en_US.UTF-8 pod install` in `ios/` (a missing pod once made the iOS build crash on launch).
 
 ## Agent skills
