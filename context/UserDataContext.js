@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { agedProfile, adaptedProfile } from '../constants/bodyCalc';
+import { agedProfile, adaptedProfile, refreshedProfile } from '../constants/bodyCalc';
 
 const STORAGE_KEY = '@calorie_app_user_data';
 const AUTH_KEY    = '@calorie_app_auth';
@@ -278,12 +278,13 @@ export function UserDataProvider({ children }) {
 
   // 自動更新 profile（見 constants/bodyCalc.js）：
   // 1) 年齡：有生日依生日算，沒有就每滿一年 +1，並重算 BMR / TDEE / 目標熱量（agedProfile）
+  //    年齡沒變但存著的目標熱量跟公式對不上（公式改過、舊資料）也重算一次（refreshedProfile）
   // 2) Adaptive adjustment：累積 2–4 週記錄和體重後，依 7 日平均體重趨勢小幅調整目標熱量（adaptedProfile）
   // 只改 profile，不走 updateProfile：那個會把今天記成「量過體重」，預估體重就會被歸零重算
   useEffect(() => {
     if (!loaded || !authEmail || !profile) return;
     const today = dateKey();
-    const aged = agedProfile(profile, today);
+    const aged = agedProfile(profile, today) ?? refreshedProfile(profile);
     const next = adaptedProfile(aged ?? profile, dailyLogs, today) ?? aged;
     if (!next) return;
     setProfile(next);

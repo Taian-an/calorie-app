@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
-import { catchUpPlan, macroTargets as goalMacroTargets, adaptiveCheck, MACRO_RULE_FOR, GOAL_DELTAS, MIN_TARGET, ADAPT } from '../../constants/bodyCalc';
+import { catchUpPlan, macroTargets as goalMacroTargets, adaptiveCheck, MACRO_RULE_FOR, goalDelta as goalDeltaOf, goalDeltaCapped, MIN_TARGET, ADAPT } from '../../constants/bodyCalc';
 import { entryPhotoUri } from '../../constants/nutrition';
 import { useAddFood } from '../../components/AddFoodSheet';
 import { useTheme, useStyles } from '../../context/PreferencesContext';
@@ -184,7 +184,14 @@ function TargetInfoModal({ profile, dailyLogs, t, onClose }) {
   const n = v => Math.round(v).toLocaleString();
   const signed = v => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${n(Math.abs(v))}`;
   const activity = t.activities.find(a => a.key === profile.activity);
-  const goalDelta = GOAL_DELTAS[profile.goal] ?? 0;
+  const goalDelta = goalDeltaOf(profile);
+  const timelineSub = profile.goal === 'maintain'
+    ? t.targetInfoGoalMaintain
+    : profile.targetWeight != null && profile.goalMonths > 0
+      ? (goalDeltaCapped(profile) ? t.targetInfoGoalCapped : t.targetInfoGoalTimeline)
+        .replace('{kg}', Math.abs(Math.round((profile.targetWeight - profile.weight) * 10) / 10))
+        .replace('{m}', profile.goalMonths)
+      : t.targetInfoGoalSub;
   const adjustment = profile.targetAdjustment ?? 0;
   const check = adaptiveCheck(profile, dailyLogs, dateKey());
   const rule = MACRO_RULE_FOR(profile.goal);
@@ -192,7 +199,7 @@ function TargetInfoModal({ profile, dailyLogs, t, onClose }) {
   const rows = [
     { label: t.targetInfoBmr, sub: t.targetInfoBmrSub, value: `${n(profile.bmr)} kcal` },
     { label: t.targetInfoTdee, sub: t.targetInfoTdeeSub.replace('{a}', activity?.label ?? '').replace('{f}', activity?.factor ?? 1.2), value: `${n(profile.tdee)} kcal` },
-    { label: t.targetInfoGoal.replace('{goal}', goalLabel(t, profile.goal)), sub: t.targetInfoGoalSub, value: `${signed(goalDelta)} kcal` },
+    { label: t.targetInfoGoal.replace('{goal}', goalLabel(t, profile.goal)), sub: timelineSub, value: `${signed(goalDelta)} kcal` },
     {
       label: t.targetInfoAdaptive,
       sub: adjustment

@@ -82,8 +82,15 @@ _Avoid_: Target, 目標 (on its own)
 The weight the user wants to reach, first asked in onboarding and changeable in the Profile. It sets the Goal.
 _Avoid_: Target weight (in conversation), ideal weight
 
+**Goal timeline**:
+How many months the user gives themselves to reach the Goal weight, first asked in onboarding and changeable in the Profile.
+_Avoid_: Deadline, duration
+
+**Goal change**:
+The daily kcal added to or taken from TDEE for the Goal: the kg still to go × 7,700 kcal, spread evenly over every day of the Goal timeline, worked out from the current weight each time. Kept within safe limits: at most 1,000 kcal less a day and no more than 25% of TDEE when losing fat, at most 500 kcal more when building muscle. Without a Goal weight or Goal timeline it is a fixed −400 (lose fat) or +300 (build muscle); maintaining is 0.
+
 **Target**:
-The user's daily calorie goal in kcal: TDEE plus the Goal's change (−400 to lose fat, +300 to build muscle) plus any Adaptive adjustment, never below 1,200 kcal. It is not set by hand. Each Day keeps the Target that applied on that Day, so changing it later does not rewrite past Days.
+The user's daily calorie goal in kcal: TDEE plus the Goal change plus any Adaptive adjustment, never below 1,200 kcal. It is not set by hand. Each Day keeps the Target that applied on that Day, so changing it later does not rewrite past Days.
 _Avoid_: Goal, calorie budget
 
 **Weight trend**:

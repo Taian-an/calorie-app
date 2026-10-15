@@ -5,8 +5,13 @@ export const GENDER_KEYS = ['male', 'female', 'other'];
 
 const ACTIVITY_FACTORS = { sedentary: 1.2, lightly: 1.375, moderately: 1.55, very: 1.725, extra: 1.9 };
 
-// 目標模式對 TDEE 的增減
+// 沒有目標體重或目標時程時，目標模式對 TDEE 的固定增減
 export const GOAL_DELTAS = { bulk: 300, cut: -400, maintain: 0 };
+// 依時程算出來的每日增減，夾在安全範圍內：
+// 減脂每天最多少 1000 kcal，也不超過 TDEE 的 25%；增肌每天最多多 500 kcal（再多長的多半是脂肪）
+export const GOAL_LIMITS = { maxDeficit: 1000, maxDeficitShare: 0.25, maxSurplus: 500 };
+const DAYS_PER_MONTH = 30.44;
+const KCAL_PER_KG = 7700;
 // 目標熱量的安全下限：再怎麼減脂、再怎麼動態調整，都不建議每天低於這個數字
 export const MIN_TARGET = 1200;
 
@@ -30,9 +35,30 @@ export function goalFromWeights(weight, targetWeight) {
   return targetWeight > weight + 0.3 ? 'bulk' : targetWeight < weight - 0.3 ? 'cut' : 'maintain';
 }
 
-// Target = TDEE + Goal 增減 + Adaptive adjustment（見 GLOSSARY），不低於 MIN_TARGET
-export function targetCalories(tdee, goal, adjustment = 0) {
-  return Math.max(MIN_TARGET, tdee + (GOAL_DELTAS[goal] ?? 0) + (adjustment || 0));
+// Goal 的每日熱量增減（Goal change，見 GLOSSARY）：
+// 有目標體重和目標時程 → (目標體重 − 體重) × 7700 kcal 平均分到時程的每一天，再夾進安全範圍；
+// 每次重算都用「現在的體重」和整段時程，越接近目標體重，增減就越小。
+// 缺任一項（舊資料）就退回 GOAL_DELTAS 的固定值。維持期一律 0
+export function goalDelta(p) {
+  if (!p || p.goal === 'maintain') return 0;
+  if (p.targetWeight == null || !(p.goalMonths > 0) || p.weight == null) return GOAL_DELTAS[p.goal] ?? 0;
+  const daily = ((p.targetWeight - p.weight) * KCAL_PER_KG) / (p.goalMonths * DAYS_PER_MONTH);
+  if (daily < 0) {
+    const maxDeficit = Math.min(GOAL_LIMITS.maxDeficit, (p.tdee ?? Infinity) * GOAL_LIMITS.maxDeficitShare);
+    return Math.max(-maxDeficit, daily);
+  }
+  return Math.min(GOAL_LIMITS.maxSurplus, daily);
+}
+// 有沒有被安全範圍擋下（時程太短）：資訊面板用來提醒
+export function goalDeltaCapped(p) {
+  if (!p || p.goal === 'maintain' || p.targetWeight == null || !(p.goalMonths > 0) || p.weight == null) return false;
+  const daily = ((p.targetWeight - p.weight) * KCAL_PER_KG) / (p.goalMonths * DAYS_PER_MONTH);
+  return Math.abs(daily - goalDelta(p)) > 1;
+}
+
+// Target = TDEE + Goal change + Adaptive adjustment（見 GLOSSARY），不低於 MIN_TARGET
+export function targetCalories(p) {
+  return Math.max(MIN_TARGET, p.tdee + goalDelta(p) + (p.targetAdjustment || 0));
 }
 
 // 身體資料改了（性別、生日、身高、體重、目標體重、活動量）就用這支重算整份 profile：
@@ -41,7 +67,8 @@ export function recalcProfile(p) {
   const bmr = calcBmr(p.gender, p.weight, p.height, p.age);
   const tdee = bmr * activityFactor(p.activity);
   const goal = goalFromWeights(p.weight, p.targetWeight) ?? (GOAL_DELTAS[p.goal] != null ? p.goal : 'maintain');
-  return { ...p, bmr, tdee, goal, target: targetCalories(tdee, goal, p.targetAdjustment) };
+  const next = { ...p, bmr, tdee, goal };
+  return { ...next, target: targetCalories(next) };
 }
 
 // 三大營養素目標依 Goal 調整：蛋白質依體重（減脂 2.0 g/kg 保肌肉、增肌 1.8、維持 1.6），
@@ -91,7 +118,6 @@ export const ADAPT = {
   totalMax: 400,
   minChange: 50,     // 差不到 50 kcal 就不調
 };
-const KCAL_PER_KG = 7700;
 
 export function adaptiveCheck(profile, dailyLogs, todayKey) {
   if (!profile?.tdee || profile.target == null) return { ready: false };
@@ -116,7 +142,7 @@ export function adaptiveCheck(profile, dailyLogs, todayKey) {
   const endAvg = trend[trend.length - 1].avg;
   const avgIntake = logged.reduce((sum, d) => sum + d.energy, 0) / logged.length;
   const estimatedTdee = avgIntake - ((endAvg - startAvg) * KCAL_PER_KG) / span;
-  const ideal = estimatedTdee + (GOAL_DELTAS[profile.goal] ?? 0);
+  const ideal = estimatedTdee + goalDelta(profile);
   return { ready: true, ...status, startAvg, endAvg, avgIntake, estimatedTdee, ideal };
 }
 
@@ -134,10 +160,17 @@ export function adaptedProfile(profile, dailyLogs, todayKey) {
   return {
     ...profile,
     targetAdjustment: current + step,
-    target: targetCalories(profile.tdee, profile.goal, current + step),
+    target: targetCalories({ ...profile, targetAdjustment: current + step }),
     targetAdjustedAt: todayKey,
     lastAdjustment: step,
   };
+}
+
+// 存著的 Goal / 目標熱量跟公式算出來的不一樣（例如公式更新了、舊資料還沒重算）就回傳重算後的 profile，一樣就回傳 null
+export function refreshedProfile(profile) {
+  if (profile?.height == null || profile.weight == null || profile.age == null) return null;
+  const next = recalcProfile(profile);
+  return next.goal !== profile.goal || Math.abs(next.target - (profile.target ?? 0)) > 1 ? next : null;
 }
 
 // ── 生日 → 年齡 ──────────────────────────────────────────────────────
