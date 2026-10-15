@@ -13,7 +13,7 @@ import { scaleEntry, entryPhotoUri, GRAMS_PER_OZ } from '../constants/nutrition'
 const round1 = v => Math.round(v * 10) / 10;
 
 // 一筆已記錄的食物（Entry）的詳細頁：從日誌點進來，網址帶 date（Day）和 time（Entry 的識別）。
-// 名稱、份量、餐次都能改，改了立刻存（跟日誌其他操作一樣同步上雲）；份量一改，熱量和營養素等比例跟著變
+// 名稱、份量、餐次改的是草稿，畫面上的熱量和營養素會跟著份量等比例預覽；按底部的「儲存」才寫進日誌並回上一頁
 export default function EntryScreen() {
   const { lang, t } = useLanguage();
   const { C, units } = usePreferences();
@@ -30,9 +30,11 @@ export default function EntryScreen() {
 
   const [name, setName] = useState(entry?.name ?? '');
   const [serving, setServing] = useState(servingText(entry));
-  // 換了一筆、或在別處（例如雲端同步）改過時，輸入框跟著更新
+  const [mealType, setMealType] = useState(entry?.mealType ?? 'snacks');
+  // 換了一筆、或在別處（例如雲端同步）改過時，草稿跟著更新
   useEffect(() => { setName(entry?.name ?? ''); }, [entry?.name]);
   useEffect(() => { setServing(servingText(entry)); }, [entry?.grams, entry?.servings, units]);
+  useEffect(() => { setMealType(entry?.mealType ?? 'snacks'); }, [entry?.mealType]);
 
   if (!entry) {
     return (
@@ -43,20 +45,25 @@ export default function EntryScreen() {
     );
   }
 
-  const commitName = () => {
-    const next = name.trim();
-    if (!next) { setName(entry.name); return; }
-    if (next !== entry.name) update({ name: next });
-  };
-
-  const commitServing = () => {
-    const v = parseFloat(serving);
-    if (!(v > 0)) { setServing(servingText(entry)); return; }
+  // 草稿份量是原本的幾倍；輸入不合法（空的、0）時當作沒改
+  const servingValue = parseFloat(serving);
+  const factor = (() => {
+    if (!(servingValue > 0)) return 1;
     const current = byGrams ? entry.grams : (entry.servings ?? 1);
-    const next = byGrams ? (imperial ? v * GRAMS_PER_OZ : v) : v;
-    const factor = next / current;
-    if (Math.abs(factor - 1) < 1e-6) return;
-    update(scaleEntry(entry, factor));
+    const next = byGrams ? (imperial ? servingValue * GRAMS_PER_OZ : servingValue) : servingValue;
+    const f = next / current;
+    return Math.abs(f - 1) < 1e-6 ? 1 : f;
+  })();
+  const preview = factor === 1 ? entry : { ...entry, ...scaleEntry(entry, factor) };
+
+  const save = () => {
+    const patch = {};
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== entry.name) patch.name = trimmed;
+    if (factor !== 1) Object.assign(patch, scaleEntry(entry, factor));
+    if (mealType !== entry.mealType) patch.mealType = mealType;
+    if (Object.keys(patch).length) update(patch);
+    router.canGoBack() ? router.back() : router.replace('/');
   };
 
   const photo = entryPhotoUri(entry);
@@ -83,8 +90,6 @@ export default function EntryScreen() {
             style={s.nameInput}
             value={name}
             onChangeText={setName}
-            onBlur={commitName}
-            onSubmitEditing={commitName}
             returnKeyType="done"
             maxLength={80}
           />
@@ -97,8 +102,7 @@ export default function EntryScreen() {
               style={s.servingInput}
               value={serving}
               onChangeText={txt => setServing(txt.replace(/[^0-9.]/g, ''))}
-              onBlur={commitServing}
-              onSubmitEditing={commitServing}
+              onBlur={() => { if (!(parseFloat(serving) > 0)) setServing(servingText(entry)); }}
               keyboardType="decimal-pad"
               returnKeyType="done"
               selectTextOnFocus
@@ -110,7 +114,7 @@ export default function EntryScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>{t.entryNutrition}</Text>
           <View style={s.kcalRow}>
-            <Text style={s.kcal}>{Math.round(entry.energy || 0)}</Text>
+            <Text style={s.kcal}>{Math.round(preview.energy || 0)}</Text>
             <Text style={s.kcalUnit}>kcal</Text>
           </View>
           <View style={s.macroRow}>
@@ -120,14 +124,14 @@ export default function EntryScreen() {
               { key: 'fat', label: t.fatShort, color: C.macroFat },
             ].map(m => (
               <View key={m.key} style={s.macroBox}>
-                <Text style={[s.macroVal, { color: m.color }]}>{round1(entry[m.key] || 0)} g</Text>
+                <Text style={[s.macroVal, { color: m.color }]}>{round1(preview[m.key] || 0)} g</Text>
                 <Text style={s.macroLabel}>{m.label}</Text>
               </View>
             ))}
           </View>
           <TouchableOpacity
             style={s.moreRow}
-            onPress={() => router.push({ pathname: '/entry-nutrition', params: { date, time: String(time) } })}
+            onPress={() => router.push({ pathname: '/entry-nutrition', params: { date, time: String(time), factor: String(factor) } })}
             activeOpacity={0.7}
           >
             <Text style={s.moreText}>{t.entryMoreNutrition}</Text>
@@ -142,10 +146,16 @@ export default function EntryScreen() {
           </View>
           <View style={s.divider} />
           <Text style={s.label}>{t.entryCategory}</Text>
-          {/* 改餐次就直接存，日誌頁會自動把這筆排到新的餐次底下 */}
-          <MealPicker value={entry.mealType ?? 'snacks'} onChange={type => update({ mealType: type })} t={t} />
+          {/* 存檔後日誌頁會自動把這筆排到新的餐次底下 */}
+          <MealPicker value={mealType} onChange={setMealType} t={t} />
         </View>
       </ScrollView>
+
+      <View style={s.footer}>
+        <TouchableOpacity style={s.saveBtn} onPress={save} activeOpacity={0.85}>
+          <Text style={s.saveBtnText}>{t.saveLabel}</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -192,4 +202,8 @@ const makeStyles = (C) => StyleSheet.create({
 
   infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   infoValue: { fontSize: 14, fontWeight: '700', color: C.textPrimary },
+
+  footer: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 18, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
+  saveBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', backgroundColor: C.primary },
+  saveBtnText: { fontSize: 16, fontWeight: '800', color: C.onPrimary },
 });

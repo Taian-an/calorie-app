@@ -1,5 +1,5 @@
 import {
-  View, Text, TouchableOpacity,
+  View, Text, TouchableOpacity, Image,
   StyleSheet, ScrollView, SafeAreaView, Modal, Animated, PanResponder, Pressable,
 } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
 import { useUserData, dateKey, dateKeyOf, MEAL_TYPES } from '../../context/UserDataContext';
 import { catchUpPlan } from '../../constants/bodyCalc';
+import { entryPhotoUri } from '../../constants/nutrition';
 import { useAddFood } from '../../components/AddFoodSheet';
 import { useTheme, useStyles } from '../../context/PreferencesContext';
 
@@ -164,9 +165,22 @@ function MealSection({ type, meals, goal, t, open, onToggle, onAdd, onRemove, on
             onPressOut={onPressOut}
             accessibilityHint={t.dragToMoveHint}
           >
-            <Ionicons name="reorder-two-outline" size={16} color={C.border} />
-            <Text style={s.mealItemName} numberOfLines={1}>{m.name}</Text>
-            <Text style={s.mealItemKcal}>{Math.round(m.energy || 0)} kcal</Text>
+            {entryPhotoUri(m) ? (
+              <Image source={{ uri: entryPhotoUri(m) }} style={s.mealThumb} />
+            ) : (
+              <View style={[s.mealThumb, s.mealThumbEmpty]}>
+                <Ionicons name="restaurant-outline" size={20} color={C.textMuted} />
+              </View>
+            )}
+            <View style={s.mealItemInfo}>
+              <Text style={s.mealItemName} numberOfLines={1}>{m.name}</Text>
+              <View style={s.mealItemMacros}>
+                <Text style={[s.mealItemMacro, { color: C.macroProtein }]}>{t.macroP} {Math.round(m.protein || 0)}g</Text>
+                <Text style={[s.mealItemMacro, { color: C.macroCarbs }]}>{t.macroC} {Math.round(m.carbs || 0)}g</Text>
+                <Text style={[s.mealItemMacro, { color: C.macroFat }]}>{t.macroF} {Math.round(m.fat || 0)}g</Text>
+              </View>
+            </View>
+            <Text style={s.mealItemKcal}>{Math.round(m.energy || 0)}<Text style={s.mealItemKcalUnit}> kcal</Text></Text>
             <TouchableOpacity onPress={() => onRemove(m.time)} hitSlop={8}>
               <Ionicons name="trash-outline" size={16} color={C.macroFat} />
             </TouchableOpacity>
@@ -543,7 +557,7 @@ export default function DiaryScreen() {
       {drag && (
         <Animated.View pointerEvents="none" style={[s.dragGhost, { transform: [{ translateY: ghostY }] }]}>
           <Ionicons name="reorder-two-outline" size={16} color={C.primaryDark} />
-          <Text style={s.mealItemName} numberOfLines={1}>{drag.meal.name}</Text>
+          <Text style={[s.mealItemName, { flex: 1 }]} numberOfLines={1}>{drag.meal.name}</Text>
           <Text style={s.mealItemKcal}>{Math.round(drag.meal.energy || 0)} kcal</Text>
         </Animated.View>
       )}
@@ -846,7 +860,7 @@ const makeStyles = (C) => StyleSheet.create({
 
   /* 餐次卡片 */
   mealCard: {
-    backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 12,
+    backgroundColor: C.card, borderRadius: 18, padding: 18, marginBottom: 14,
     borderWidth: 2, borderColor: 'transparent', // 拖曳時目的地卡片改成綠框，平常留透明框避免版面跳動
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
@@ -862,18 +876,24 @@ const makeStyles = (C) => StyleSheet.create({
   },
   mealHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   mealEmoji:  { fontSize: 26 },
-  mealName:   { fontSize: 14, fontWeight: '800', color: C.textPrimary },
-  mealKcal:   { fontSize: 12, fontWeight: '600', color: C.textSecondary, marginTop: 1 },
+  mealName:   { fontSize: 17, fontWeight: '800', color: C.textPrimary },
+  mealKcal:   { fontSize: 13, fontWeight: '600', color: C.textSecondary, marginTop: 2 },
   addBtn: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: C.primary,
+    width: 36, height: 36, borderRadius: 18, backgroundColor: C.primary,
     justifyContent: 'center', alignItems: 'center', marginLeft: 4,
   },
   mealItemRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.muted,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.muted,
   },
-  mealItemName: { flex: 1, fontSize: 13, fontWeight: '600', color: C.textPrimary },
-  mealItemKcal: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
+  mealThumb:      { width: 52, height: 52, borderRadius: 12, backgroundColor: C.muted },
+  mealThumbEmpty: { alignItems: 'center', justifyContent: 'center' },
+  mealItemInfo:   { flex: 1, minWidth: 0 },
+  mealItemName:   { fontSize: 15, fontWeight: '700', color: C.textPrimary },
+  mealItemMacros: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  mealItemMacro:  { fontSize: 12, fontWeight: '700' },
+  mealItemKcal:   { fontSize: 16, fontWeight: '800', color: C.textPrimary },
+  mealItemKcalUnit: { fontSize: 11, fontWeight: '600', color: C.textSecondary },
   noMeals: { fontSize: 12, color: C.textSecondary, fontStyle: 'italic', marginTop: 10, textAlign: 'center' },
 
   modalOverlay: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },

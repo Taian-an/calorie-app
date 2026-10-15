@@ -181,6 +181,7 @@ const translations = {
     notifyGoalReached: '達成目標通知', notifyAppUpdates: 'App 更新',
     notifyOffHint: '開啟通知後，就可以選擇要收到哪些提醒。',
     // ── 食物詳情（entry.js / entry-nutrition.js）──
+    macroP: '蛋', macroC: '碳', macroF: '脂', // 日誌每筆食物下方的營養素縮寫
     entryTitle: '食物詳情', entryName: '名稱', entryServing: '份量', entryServingsUnit: '份',
     entryNutrition: '營養成分', entryMoreNutrition: '更多營養素', entryLoggedAt: '記錄時間', entryCategory: '餐次',
     entryNotFound: '找不到這筆紀錄，可能已經被刪除了。',
@@ -378,6 +379,7 @@ const translations = {
     notifyGoalReached: 'Goal reached alerts', notifyAppUpdates: 'App updates',
     notifyOffHint: 'Turn on notifications to choose which reminders you get.',
     // ── Entry details (entry.js / entry-nutrition.js) ──
+    macroP: 'P', macroC: 'C', macroF: 'F', // short macro labels under each diary Entry
     entryTitle: 'Food details', entryName: 'Name', entryServing: 'Serving', entryServingsUnit: 'servings',
     entryNutrition: 'Nutrition', entryMoreNutrition: 'More nutrition', entryLoggedAt: 'Date & time', entryCategory: 'Category',
     entryNotFound: "This entry couldn't be found — it may have been deleted.",

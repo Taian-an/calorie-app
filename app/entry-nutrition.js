@@ -1,16 +1,20 @@
 import { View, Text, ScrollView, SafeAreaView, StyleSheet } from 'react-native';
 import { useLanguage } from '../context/LanguageContext';
 import { useStyles } from '../context/PreferencesContext';
-import { MICRO_UNITS } from '../constants/nutrition';
+import { useLocalSearchParams } from 'expo-router';
+import { MICRO_UNITS, scaleEntry } from '../constants/nutrition';
 import { EntryHeader, useEntry } from '../components/EntryParts';
 
 const round1 = v => Math.round(v * 10) / 10;
 
-// 一筆 Entry 的完整營養素：三大營養素之外的纖維、糖、鈉等（目前份量下的數值）。沒有資料的顯示「—」
+// 一筆 Entry 的完整營養素：三大營養素之外的纖維、糖、鈉等。沒有資料的顯示「—」。
+// 網址的 factor 是詳細頁上還沒儲存的份量倍數，讓這裡顯示的數字跟詳細頁的預覽一致
 export default function EntryNutritionScreen() {
   const { t } = useLanguage();
   const s = useStyles(makeStyles);
-  const { entry } = useEntry();
+  const { entry: saved } = useEntry();
+  const factor = parseFloat(useLocalSearchParams().factor);
+  const entry = saved && factor > 0 && factor !== 1 ? { ...saved, ...scaleEntry(saved, factor) } : saved;
 
   if (!entry) {
     return (
