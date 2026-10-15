@@ -22,6 +22,7 @@ const PreferencesContext = createContext(null);
 
 export function PreferencesProvider({ children }) {
   const [prefs, setPrefs] = useState(DEFAULT_PREFS);
+  const [loaded, setLoaded] = useState(false);
   const systemScheme = useColorScheme();
 
   useEffect(() => {
@@ -35,7 +36,8 @@ export function PreferencesProvider({ children }) {
           notifications: { ...prev.notifications, ...(saved.notifications ?? {}) },
         }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
   const update = useCallback((patch) => {
@@ -60,12 +62,13 @@ export function PreferencesProvider({ children }) {
 
   const value = useMemo(() => ({
     ...prefs,
+    loaded,
     scheme,
     C: PALETTES[scheme],
     setAppearance,
     setUnits,
     setNotification,
-  }), [prefs, scheme, setAppearance, setUnits, setNotification]);
+  }), [prefs, loaded, scheme, setAppearance, setUnits, setNotification]);
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }

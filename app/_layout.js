@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LanguageProvider } from '../context/LanguageContext';
 import { UserDataProvider, useUserData } from '../context/UserDataContext';
 import { PreferencesProvider, useTheme } from '../context/PreferencesContext';
+import NotificationScheduler from '../components/NotificationScheduler';
 
 // 登入是進 App 的第一道關卡，引導問卷是第二道：
 // 未登入 → login/register；登入但還沒填過身體資料（profile.height 是 null）→ onboarding；都完成才看得到 (tabs)。
@@ -17,6 +18,7 @@ function RootNavigator() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <NotificationScheduler />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
         <Stack.Protected guard={!!authEmail && onboarded}>
           <Stack.Screen name="(tabs)" />

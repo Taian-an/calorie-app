@@ -614,6 +614,7 @@ function NotificationsModal({ visible, onClose, t }) {
           ) : (
             <Text style={s.notifyHint}>{t.notifyOffHint}</Text>
           )}
+          {Platform.OS === 'web' && <Text style={s.notifyHint}>{t.notifyWebHint}</Text>}
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>

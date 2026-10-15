@@ -39,7 +39,13 @@
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to recognize food"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#22C55E"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
