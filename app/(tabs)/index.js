@@ -2,8 +2,8 @@ import {
   View, Text, TouchableOpacity,
   StyleSheet, ScrollView, SafeAreaView, Modal, Animated, PanResponder, Pressable,
 } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { useLanguage } from '../../context/LanguageContext';
@@ -182,7 +182,14 @@ export default function DiaryScreen() {
   const { C } = useTheme();
   const s = useStyles(makeStyles);
   const { lang, t } = useLanguage();
-  const { profile, dailyLogs, updateProfile, getDayTotals, getMealsByType, removeMeal, moveMeal } = useUserData();
+  const { profile, dailyLogs, updateProfile, getDayTotals, getMealsByType, removeMeal, moveMeal, refreshLogs } = useUserData();
+
+  // 回到日誌頁就跟雲端對一次，另一台裝置（手機 / 網頁版）剛記的食物才會出現
+  useFocusEffect(
+    useCallback(() => {
+      refreshLogs().catch(err => console.warn('[sync] pull failed:', err.message));
+    }, [refreshLogs])
+  );
   const [selectedKey, setSelectedKey] = useState(dateKey());
   const [weekOffset, setWeekOffset] = useState(0);
   const [showGoalModal, setShowGoalModal] = useState(false);

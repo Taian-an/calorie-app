@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { agedProfile } from '../constants/bodyCalc';
 
 const STORAGE_KEY = '@calorie_app_user_data';
 const AUTH_KEY    = '@calorie_app_auth';
+const PENDING_KEY = '@calorie_app_pending_days'; // 上傳失敗、雲端還沒有最新版本的 Day
+const PULL_MIN_INTERVAL_MS = 10000;
 const API_BASE    = process.env.EXPO_PUBLIC_API_URL;
 
 const UserDataContext = createContext(null);
@@ -55,9 +58,21 @@ export function UserDataProvider({ children }) {
   const [loaded, setLoaded] = useState(false);
   const [authEmail, setAuthEmail] = useState(null);
   const tokenRef = useRef(null); // 用 ref 讓同步函式永遠拿到最新 token
+  // 拉雲端日誌時要用到最新的本地資料，但不能讓 refreshLogs 跟著每次記錄重建
+  const logsRef = useRef({});
+  const profileRef = useRef(null);
+  useEffect(() => { logsRef.current = dailyLogs; }, [dailyLogs]);
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+  // 還沒成功上傳的 Day：重新拉雲端資料時保留本地版本、先補傳，不被雲端舊資料蓋掉
+  const pendingRef = useRef(new Set());
+  const putSeqRef = useRef({}); // 同一天連續存好幾次時，只有最後一次的結果算數
+  const lastPullRef = useRef(0);
 
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(STORAGE_KEY), AsyncStorage.getItem(AUTH_KEY)]).then(([raw, rawAuth]) => {
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY), AsyncStorage.getItem(AUTH_KEY), AsyncStorage.getItem(PENDING_KEY),
+    ]).then(([raw, rawAuth, rawPending]) => {
+      try { pendingRef.current = new Set(JSON.parse(rawPending ?? '[]')); } catch { /* ignore */ }
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
@@ -85,12 +100,73 @@ export function UserDataProvider({ children }) {
   /* ===== 雲端同步（登入後才生效，失敗不影響本地操作）===== */
   const authHeaders = () => ({ Authorization: `Bearer ${tokenRef.current}` });
 
-  // 推一天的日誌上雲（fire-and-forget）
+  const savePending = () => {
+    AsyncStorage.setItem(PENDING_KEY, JSON.stringify([...pendingRef.current])).catch(() => {});
+  };
+
+  // 推一天的日誌上雲（不等結果）。成功前這天先記成「待上傳」，失敗就留著，下次拉資料前補傳
   const syncDayUp = useCallback((date, dayLog) => {
-    if (!tokenRef.current || !dayLog) return;
-    axios.put(`${API_BASE}/logs/${date}`, dayLog, { headers: authHeaders() })
-      .catch(err => console.warn('[sync] day failed:', err.message));
+    if (!tokenRef.current || !dayLog) return Promise.resolve(false);
+    const seq = (putSeqRef.current[date] ?? 0) + 1;
+    putSeqRef.current[date] = seq;
+    pendingRef.current.add(date);
+    savePending();
+    return axios.put(`${API_BASE}/logs/${date}`, dayLog, { headers: authHeaders() })
+      .then(() => {
+        if (putSeqRef.current[date] === seq) {
+          pendingRef.current.delete(date);
+          savePending();
+        }
+        return true;
+      })
+      .catch(err => {
+        console.warn('[sync] day failed:', err.message);
+        return false;
+      });
   }, []);
+
+  // 從雲端拉最新日誌。登入時只拉一次的話，在另一台裝置（例如網頁版）記的食物永遠不會出現在這台，
+  // 所以 App 打開、切回前景、回到日誌頁都會再拉一次。
+  // 雲端為準，但還沒上傳成功的 Day 保留本地版本並先補傳；雲端沒有的本地 Day 也一樣補傳，不丟掉
+  const refreshLogs = useCallback(async ({ force = false } = {}) => {
+    const token = tokenRef.current;
+    if (!token) return;
+    if (!force && Date.now() - lastPullRef.current < PULL_MIN_INTERVAL_MS) return;
+    lastPullRef.current = Date.now();
+
+    for (const date of [...pendingRef.current]) {
+      const day = logsRef.current[date];
+      if (!day) { pendingRef.current.delete(date); savePending(); continue; }
+      await syncDayUp(date, day);
+    }
+
+    const { data: serverLogs } = await axios.get(`${API_BASE}/logs`, { headers: authHeaders() });
+    if (tokenRef.current !== token) return; // 拉資料途中登出或換帳號了
+
+    const toUpload = [];
+    setDailyLogs(prev => {
+      const next = { ...serverLogs };
+      for (const [date, day] of Object.entries(prev)) {
+        if (pendingRef.current.has(date) || !(date in serverLogs)) {
+          next[date] = day;
+          if (!pendingRef.current.has(date)) toUpload.push([date, day]);
+        }
+      }
+      persist(profileRef.current, next);
+      return next;
+    });
+    for (const [date, day] of toUpload) syncDayUp(date, day);
+  }, [persist, syncDayUp]);
+
+  // 打開 App（已登入）時拉一次；之後每次切回前景再拉
+  useEffect(() => {
+    if (!loaded || !authEmail) return;
+    refreshLogs({ force: true }).catch(err => console.warn('[sync] pull failed:', err.message));
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshLogs().catch(err => console.warn('[sync] pull failed:', err.message));
+    });
+    return () => sub.remove();
+  }, [loaded, authEmail, refreshLogs]);
 
   const syncProfileUp = useCallback((nextProfile) => {
     if (!tokenRef.current || !nextProfile) return;
@@ -99,6 +175,9 @@ export function UserDataProvider({ children }) {
   }, []);
 
   const saveAuth = async (token, email) => {
+    pendingRef.current = new Set();
+    savePending();
+    lastPullRef.current = Date.now(); // 登入流程剛拉過日誌，不用馬上再拉
     tokenRef.current = token;
     setAuthEmail(email);
     await AsyncStorage.setItem(AUTH_KEY, JSON.stringify({ token, email }));
@@ -158,9 +237,11 @@ export function UserDataProvider({ children }) {
     setAuthEmail(null);
     setProfile(null);
     setDailyLogs({});
+    pendingRef.current = new Set();
     await Promise.all([
       AsyncStorage.removeItem(AUTH_KEY),
       AsyncStorage.removeItem(STORAGE_KEY),
+      AsyncStorage.removeItem(PENDING_KEY),
     ]);
   }, []);
 
@@ -292,6 +373,7 @@ export function UserDataProvider({ children }) {
     login,
     loginWithGoogle,
     refreshProfile,
+    refreshLogs,
     logout,
     deleteAccount,
     sendCoachMessage,
