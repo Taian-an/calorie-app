@@ -30,8 +30,11 @@ _Avoid_: Account, settings
 ## Time
 
 **Day**:
-A calendar date in the user's own time zone, running from their local midnight to the next. Every per-day concept (the food diary, daily allowances, the coach's "today") uses this day.
+A calendar date in the Account's Time zone, running from local midnight to the next. Every per-day concept (the food diary, daily allowances, the coach's "today") uses this day.
 _Avoid_: UTC date, server date
+
+**Time zone**:
+The time zone kept on an Account that decides where its Days begin and end. The app reports it, and it can change at most once every 24 hours, so travelling moves the Account's Days but switching zones cannot reset a daily allowance.
 
 ## Food logging
 
@@ -92,7 +95,7 @@ The default plan. AI Analyses and coach messages are limited by a daily allowanc
 The paid plan. AI Analyses and coach messages are unlimited to the user, subject only to the fair-use cap. Described publicly as "unlimited (fair use)".
 
 **Subscription**:
-A recurring purchase made in the Android app through Google Play that gives a user Premium while it is active, wherever they sign in, including the web app. One of two ways to get Premium.
+A recurring purchase made in the Android app through Google Play that gives a user Premium while it is active, wherever they sign in, including the web app. One of two ways to get Premium. Planned, not yet on sale: until it launches, a Grant is the only way to get Premium.
 _Avoid_: Using "subscription" to mean Premium itself
 
 **Grant**:

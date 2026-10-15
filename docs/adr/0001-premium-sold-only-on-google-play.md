@@ -1,5 +1,7 @@
 # Premium is sold only through Google Play; the web app recognises it but cannot sell it
 
+_Status: accepted, not yet built. No Subscription is on sale yet; Premium currently comes only from admin Grants._
+
 Calorie Tracks launches on Google Play only (iOS deferred), and Premium is sold as a Google Play Subscription managed through RevenueCat. The web app at app.calorietracks.com stays free to use and honours Premium for signed-in Accounts, but has no checkout. We chose this to avoid running a second payment system (Stripe, tax, refunds, a second source of truth for Premium) before the product has proven itself, at the cost of not being able to convert web-only and iPhone users. Admin Grants exist alongside Subscriptions for demo and trial Accounts; an admin cannot change a Subscription.
 
 ## Consequences
